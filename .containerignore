@@ -11,3 +11,14 @@ LICENSE
 
 node_modules
 Dockerfile
+
+# Template files that won't be used by the containers
+.config
+.githooks
+scripts
+web
+api
+flake.nix
+flake.lock
+justfile
+docker-compose.yml

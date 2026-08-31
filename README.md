@@ -1,3 +1,12 @@
+# Zero-To-Kaban
+
+A fork of a simple To-Do list.  
+
+Run simply with `nix develop -c just up`, install steps are below.
+
+> [!NOTE]
+> Bellow is the [used template](https://github.com/Julian52575/Big-3-Governed-Template)'s README:
+
 # Nix + Just + Rootless Podman — The Big 3, governed
 
 <img width="653" height="758" alt="Big3NixPodJust" src="https://github.com/user-attachments/assets/0044d938-f98a-44a2-9057-2fa8246e9a1a" />
