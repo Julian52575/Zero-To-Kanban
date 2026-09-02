@@ -157,7 +157,7 @@ jobs:
           echo "Created $ISSUE_URL"
           ISSUE_NUMBER=$(basename "$ISSUE_URL")
  
-          NOTE_TEXT="This task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
+          NOTE_TEXT="------------------------------\nThis task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
           CURRENT_DESC=$(curl -sS --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
             "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}?fields=description" | jq -c '.fields.description')
  
