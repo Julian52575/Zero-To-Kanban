@@ -123,16 +123,24 @@ jobs:
             "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions")
           TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r --arg name "$JIRA_DONE_STATUS" \
             '.transitions[] | select(.name == $name) | .id' | head -n1)
-
+ 
           if [ -z "$TRANSITION_ID" ]; then
             echo "::warning::No transition named '$JIRA_DONE_STATUS' found on $JIRA_KEY — check JIRA_DONE_STATUS matches your workflow."
             exit 0
           fi
-
+ 
           curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions" \
             --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
             --data "$(jq -n --arg id "$TRANSITION_ID" '{transition: {id: $id}}')"
-
+ 
+          # Note on the Jira issue that this was an automated action, not a
+          # person manually moving the card.
+          COMMENT_TEXT="This issue was automatically transitioned to \"${JIRA_DONE_STATUS}\" by GitHub, following the linked GitHub issue being closed."
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$COMMENT_TEXT" \
+              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
+ 
       # ---------------------------------------------------------------
       # ISSUE REOPENED -> transition the Jira task back to To Do
       # ---------------------------------------------------------------
@@ -143,12 +151,20 @@ jobs:
             "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions")
           TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r --arg name "$JIRA_REOPEN_STATUS" \
             '.transitions[] | select(.name == $name) | .id' | head -n1)
-
+ 
           if [ -z "$TRANSITION_ID" ]; then
             echo "::warning::No transition named '$JIRA_REOPEN_STATUS' found on $JIRA_KEY — check JIRA_REOPEN_STATUS matches your workflow."
             exit 0
           fi
-
+ 
           curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions" \
             --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
             --data "$(jq -n --arg id "$TRANSITION_ID" '{transition: {id: $id}}')"
+ 
+          # Note on the Jira issue that this was an automated action, not a
+          # person manually moving the card.
+          COMMENT_TEXT="This issue was automatically transitioned to \"${JIRA_REOPEN_STATUS}\" by GitHub, following the linked GitHub issue being reopened."
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$COMMENT_TEXT" \
+              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
