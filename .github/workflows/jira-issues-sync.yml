@@ -143,10 +143,6 @@ jobs:
             echo "::warning::A GitHub issue already exists for Jira task $JIRA_KEY — skipping creation to avoid a duplicate."
             exit 0
           fi
- 
-          BODY=$(printf '%s\n\n---\nCreated from Jira: %s\n\n<!-- jira-issue: %s -->' \
-            "$JIRA_DESCRIPTION" "$JIRA_KEY" "$JIRA_KEY")
- 
           # Label lets the dev team filter Jira-originated issues from
           # ones opened directly on GitHub.
           ISSUE_URL=$(gh issue create --repo "$REPO" \
@@ -157,16 +153,21 @@ jobs:
           echo "Created $ISSUE_URL"
           ISSUE_NUMBER=$(basename "$ISSUE_URL")
  
-          # Report back to Jira: the dispatch call that triggered this step
-          # gets no response body (repository_dispatch always returns 204),
-          # so Jira has no way to know the issue number/URL on its own —
-          # this comment is how the Jira task learns about its GitHub issue.
-          COMMENT_TEXT="This task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
-          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
-            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
-            --data "$(jq -n --arg text "$COMMENT_TEXT" \
-              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
+          NOTE_TEXT="This task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
+          CURRENT_DESC=$(curl -sS --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}?fields=description" | jq -c '.fields.description')
  
+          if [ "$CURRENT_DESC" = "null" ] || [ -z "$CURRENT_DESC" ]; then
+            CURRENT_DESC='{"type":"doc","version":1,"content":[]}'
+          fi
+ 
+          NEW_DESC=$(echo "$CURRENT_DESC" | jq --arg text "$NOTE_TEXT" \
+            '.content += [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ]')
+ 
+          curl -sS --request PUT --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --argjson desc "$NEW_DESC" '{ fields: { description: $desc } }')" 
+
       # ---------------------------------------------------------------
       # Shared helper step for closed/reopened: pull the Jira key back
       # out of the issue body's hidden marker.
