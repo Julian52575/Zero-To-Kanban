@@ -137,13 +137,8 @@ jobs:
             exit 1
           fi
 
-          # Idempotency guard: if a GitHub issue already carries this Jira
-          # key's marker, don't create a second one. Protects against the
-          # dispatch firing more than once for the same task — e.g. the
-          # Jira rule's trigger being broader than "Issue created", a Jira
-          # Automation retry, or someone re-running the rule by hand.
           EXISTING_COUNT=$(gh search issues --repo "$REPO" --json number --jq 'length' \
-            -- "\"jira-issue: ${JIRA_KEY}\" in:body" 2>/dev/null || echo 0)
+            -- "\"Created from Jira: ${JIRA_PROJECT_KEY}-${JIRA_KEY}\" in:body" 2>/dev/null || echo 0)
           if [ "$EXISTING_COUNT" -gt 0 ] 2>/dev/null; then
             echo "::warning::A GitHub issue already exists for Jira task $JIRA_KEY — skipping creation to avoid a duplicate."
             exit 0
