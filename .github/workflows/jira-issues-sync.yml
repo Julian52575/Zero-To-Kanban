@@ -143,6 +143,10 @@ jobs:
             echo "::warning::A GitHub issue already exists for Jira task $JIRA_KEY — skipping creation to avoid a duplicate."
             exit 0
           fi
+
+          BODY=$(printf '%s\n\n---\nCreated from Jira: %s\n\n<!-- jira-issue: %s -->' \
+            "$JIRA_DESCRIPTION" "$JIRA_KEY" "$JIRA_KEY")
+          
           # Label lets the dev team filter Jira-originated issues from
           # ones opened directly on GitHub.
           ISSUE_URL=$(gh issue create --repo "$REPO" \
