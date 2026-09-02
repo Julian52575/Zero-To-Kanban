@@ -15,6 +15,8 @@ name: Sync GitHub Issues to Jira
 on:
   issues:
     types: [opened, closed, reopened]
+  repository_dispatch:
+    types: [jira_task_created]
 
 permissions:
   issues: write
@@ -44,22 +46,36 @@ jobs:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-
+ 
     steps:
       # ---------------------------------------------------------------
+      # Strip any trailing slash from JIRA_BASE_URL so a mistyped secret
+      # (e.g. "https://acme.atlassian.net/") doesn't produce a
+      # double-slash URL that Jira responds to with a 302 redirect
+      # instead of the actual API response.
+      # ---------------------------------------------------------------
+      - name: Normalize Jira base URL
+        run: echo "JIRA_BASE_URL=${JIRA_BASE_URL%/}" >> "$GITHUB_ENV"
+ 
+      # ---------------------------------------------------------------
       # ISSUE OPENED -> create the Jira task and link the two records
+      #
+      # Skipped when the issue body already carries a "jira-issue" marker
+      # — that means this issue was itself created by the step below (in
+      # response to a Jira task being created), so it's already linked and
+      # creating a second Jira task here would just duplicate it.
       # ---------------------------------------------------------------
       - name: Create Jira issue
-        if: github.event.action == 'opened'
+        if: github.event.action == 'opened' && !contains(github.event.issue.body, '<!-- jira-issue:')
         run: |
           DESCRIPTION=$(cat <<EOF
           ${ISSUE_BODY}
-
+ 
           ---
           Created from GitHub issue #${ISSUE_NUMBER}: ${ISSUE_URL}
           EOF
           )
-
+ 
           PAYLOAD=$(jq -n \
             --arg summary "$ISSUE_TITLE" \
             --arg description "$DESCRIPTION" \
@@ -76,34 +92,67 @@ jobs:
                 }
               }
             }')
-
+ 
           RESPONSE=$(curl -sS -w "\n%{http_code}" \
             --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue" \
             --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
             --header "Content-Type: application/json" --data "$PAYLOAD")
-
+ 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "Jira response ($HTTP_STATUS): $BODY"
           [ "$HTTP_STATUS" -lt 300 ] || { echo "::error::Failed to create Jira issue"; exit 1; }
-
+ 
           JIRA_KEY=$(echo "$BODY" | jq -r '.key')
           echo "JIRA_KEY=$JIRA_KEY" >> "$GITHUB_ENV"
-
+ 
           # Stamp the Jira key into the GitHub issue body (hidden marker) so
           # later events (closed/reopened) can recover it.
           NEW_BODY=$(printf '%s\n\n<!-- jira-issue: %s -->' "$ISSUE_BODY" "$JIRA_KEY")
           gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" -X PATCH -f body="$NEW_BODY"
-
+ 
           gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
             --body "Tracked in Jira: ${JIRA_KEY}"
-
+ 
+      # ---------------------------------------------------------------
+      # JIRA TASK CREATED -> create the matching GitHub issue
+      #
+      # Triggered by a repository_dispatch call ("jira_task_created") that
+      # a Jira Automation rule sends when a new Task is created — see
+      # JIRA_AUTOMATION_SETUP.md. The Jira key is stamped into the body as
+      # the same hidden marker used everywhere else, so this issue is
+      # already linked from the moment it exists — and so the "Create Jira
+      # issue" step above skips it when GitHub's own "opened" event fires
+      # for it a moment later, avoiding a duplicate Jira task.
+      # ---------------------------------------------------------------
+      - name: Create GitHub issue from Jira task
+        if: github.event_name == 'repository_dispatch' && github.event.action == 'jira_task_created'
+        env:
+          JIRA_KEY: ${{ github.event.client_payload.jira_key }}
+          JIRA_SUMMARY: ${{ github.event.client_payload.summary }}
+          JIRA_DESCRIPTION: ${{ github.event.client_payload.description }}
+        run: |
+          if [ -z "$JIRA_KEY" ]; then
+            echo "::error::repository_dispatch payload is missing jira_key — check the Jira Automation rule's request body."
+            exit 1
+          fi
+ 
+          BODY=$(printf '%s\n\n---\nCreated from Jira: %s\n\n<!-- jira-issue: %s -->' \
+            "$JIRA_DESCRIPTION" "$JIRA_KEY" "$JIRA_KEY")
+ 
+          # Label lets the dev team filter Jira-originated issues from
+          # ones opened directly on GitHub.
+          gh issue create --repo "$REPO" \
+            --title "$JIRA_SUMMARY" \
+            --body "$BODY" \
+            --label "jira-auto"
+ 
       # ---------------------------------------------------------------
       # Shared helper step for closed/reopened: pull the Jira key back
       # out of the issue body's hidden marker.
       # ---------------------------------------------------------------
       - name: Extract linked Jira key
-        if: github.event.action != 'opened'
+        if: github.event_name == 'issues' && github.event.action != 'opened'
         run: |
           JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-issue: )[A-Z][A-Z0-9]+-[0-9]+(?= -->)' || true)
           if [ -z "$JIRA_KEY" ]; then
@@ -112,7 +161,7 @@ jobs:
           else
             echo "JIRA_KEY=$JIRA_KEY" >> "$GITHUB_ENV"
           fi
-
+ 
       # ---------------------------------------------------------------
       # ISSUE CLOSED -> transition the Jira task to Done
       # ---------------------------------------------------------------
