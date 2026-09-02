@@ -142,10 +142,23 @@ jobs:
  
           # Label lets the dev team filter Jira-originated issues from
           # ones opened directly on GitHub.
-          gh issue create --repo "$REPO" \
+          ISSUE_URL=$(gh issue create --repo "$REPO" \
             --title "$JIRA_SUMMARY" \
             --body "$BODY" \
-            --label "jira-auto"
+            --label "jira-auto")
+ 
+          echo "Created $ISSUE_URL"
+          ISSUE_NUMBER=$(basename "$ISSUE_URL")
+ 
+          # Report back to Jira: the dispatch call that triggered this step
+          # gets no response body (repository_dispatch always returns 204),
+          # so Jira has no way to know the issue number/URL on its own —
+          # this comment is how the Jira task learns about its GitHub issue.
+          COMMENT_TEXT="This task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$COMMENT_TEXT" \
+              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
  
       # ---------------------------------------------------------------
       # Shared helper step for closed/reopened: pull the Jira key back
