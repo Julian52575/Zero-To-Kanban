@@ -2,7 +2,8 @@
 
 A fork of a simple To-Do list.  
 
-Run simply with `nix develop -c just up`, install steps are below.
+`cp .env.example .env` and update .env.
+Then run simply with `nix develop -c just up`, install steps are below.
 
 > [!NOTE]
 > Bellow is the [used template](https://github.com/Julian52575/Big-3-Governed-Template)'s README:
