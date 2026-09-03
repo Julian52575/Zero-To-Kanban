@@ -210,6 +210,46 @@ Keep the two in sync when you customise: the type list lives in both
 Make your developers refer to the [Conventional Commits Cheatsheet](https://gist.github.com/qoomon/5dfcdf8eec66a051ecd85625518cfd13#commit-message-formats)   
 or the [Official Summary](https://www.conventionalcommits.org/en/v1.0.0/#summary) for convenience. 
 
+### Issue templates
+
+`.github/ISSUE_TEMPLATE/` ships four [issue forms](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository)
+— structured fields rather than a blank box — and `config.yml` turns off blank
+issues, so every issue arrives in one of these shapes. Each form auto-applies a
+type label plus `needs-triage`, and each opens with a "not a duplicate"
+pre-submit check.
+
+| Form | For | Key fields |
+| ---- | --- | ---------- |
+| **Feature** | a new capability or an enhancement | Problem (the need, not the solution), Proposed solution, Alternatives, rough scope |
+| **Bug** | incorrect behaviour in something that exists | What's wrong, Steps to reproduce (from a clean checkout), Expected vs actual, Environment (`git rev-parse HEAD`), Logs |
+| **R&D** | a research spike or open design question | Question/hypothesis, Definition of done, Context and constraints, rough scope |
+| **Debt** | it works, but the code or design carries a shortcut | The shortcut (and where), Cost it carries, Proposed cleanup, interest accrual |
+
+Security reports are routed away from public issues: `config.yml` links to
+**private vulnerability reporting** instead (replace `OWNER/REPO` after using the
+template).
+
+The forms are the front half of the workflow: an issue defines the *problem*, a
+PR closing it carries the *solution*. That split is why the PR template below can
+stay so small.
+
+### Pull request template
+
+`.github/PULL_REQUEST_TEMPLATE.md` pre-fills every new PR. It is deliberately
+short: the [issue forms](.github/ISSUE_TEMPLATE/) already capture the *problem*
+(what's wrong, repro, proposed change, alternatives), and the Conventional-Commit
+PR title already encodes the *type* of change. Repeating any of that in the PR
+body is noise. Every PR is expected to close an issue, so the template only asks
+for what a **reviewer** can't get from the linked issue or the diff:
+
+| Field | Why it's there |
+| ----- | -------------- |
+| `Closes #NNN` | Required. Links the issue and auto-closes it on merge. Branch and push first if you like, but the issue must exist before the PR is opened. |
+| What changed | One or two lines on the shape of the diff — the "why" stays in the issue. |
+| How it was verified | The steps a reviewer repeats to trust the change; not something the issue knows. |
+| Risk / rollback | Breaking changes, migrations, blast radius. "None" is a valid answer. |
+| Checklist | "meant to close an issue" plus tests / docs — the easily-forgotten parts. |
+
 ### Branch ruleset & repository settings
 
 The template ships prepared settings as json and a script to apply it directly:
@@ -279,14 +319,100 @@ Requests* in the UI):
 | Secret scanning + push protection | free on **public** repos; private needs GitHub Advanced Security |
 | Private vulnerability reporting | free on every repo |
 
+**Actions settings** (set by the script; *Settings → Actions → General* in the UI):
+
+| Setting | Value | Why |
+| ------- | ----- | --- |
+| Default `GITHUB_TOKEN` permissions | read-only | workflows get a read token unless they opt in with their own `permissions:` block |
+
 The script treats the security calls as best-effort — on a plan that doesn't
 include one it prints a warning and moves on.
 
 #### BONUS: Org-level (can't be scripted per-repo)
 
 Set these once for the organisation, not the repo:  
-**require 2FA for all members**, and under *Actions → General* set **fork pull request workflows** to
-require approval and **workflow permissions** to read-only by default.
+**require 2FA for all members**, and under *Actions → General* set **fork pull request workflows** to require approval. 
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every PR (plus pushes to `main`, and
+manually via `workflow_dispatch`). It hardens against the common CI foot-guns:
+
+- **`concurrency`** cancels a run when the same PR pushes again, so you never
+  pay for a stale run.
+- **`timeout-minutes`** on every job (default is 6 hours otherwise).
+- **Third-party actions pinned to a commit SHA** (with a `# vX.Y.Z` comment for
+  Dependabot to track) — a tag is a mutable pointer the action owner can move
+  at any time; a SHA can't be.
+- **Least-privilege `permissions:`** declared per workflow, on top of the
+  read-only `GITHUB_TOKEN` default `scripts/apply-governance.sh` sets for the
+  whole repo.
+- **`persist-credentials: false`** on `actions/checkout` in jobs that never
+  push, so the token isn't left on disk for later steps to read.
+
+### `setup-devshell` composite action
+
+`.github/actions/setup-devshell/` installs Nix and warms the dev shell; every
+workflow that needs the toolbox uses it (`uses: ./.github/actions/setup-devshell`)
+instead of repeating those steps. The caller must run `actions/checkout`
+first — a local composite action can't check out the repo it lives in.
+
+It also caches the Nix store via
+[`nix-community/cache-nix-action`](https://github.com/nix-community/cache-nix-action),
+backed by the GitHub Actions cache. That needs no external account or secret,
+so it works out of the box for anyone who uses this template — but it shares
+GitHub's 10 GB/repo cache budget with everything else and gives up cache hits
+the moment the repo is forked or renamed.
+
+**Upgrading to Cachix.** If you want a real binary cache — shared across CI
+*and* your machine, not capped at 10 GB — swap in
+[`cachix/cachix-action`](https://github.com/cachix/cachix-action):
+
+1. Create a cache at [cachix.org](https://www.cachix.org/) (free for public
+   caches) and generate an auth token.
+2. Add it as the repo secret `CACHIX_AUTH_TOKEN`.
+3. Replace the `cache-nix-action` step in `setup-devshell/action.yml` with:
+   ```yaml
+   - uses: cachix/cachix-action@<pin-to-a-commit-sha> # vX.Y.Z
+     with:
+       name: <your-cachix-cache-name>
+       authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+   ```
+4. Optionally declare the same substituter in `flake.nix`'s `nixConfig` so
+   local `nix develop` reads from it too, not just CI.
+
+This is *not* the template default because it points at an account only the
+template's original owner controls — every repo made from this template would
+need to swap it for their own cache.
+
+### OpenSSF Scorecard audit
+
+`.github/workflows/openssf-scorecard.yml` runs
+[OpenSSF Scorecard](https://github.com/ossf/scorecard) — an automated audit of
+the repo's supply-chain and governance posture (branch protection, pinned
+dependencies, token permissions, code review, …) — every **Monday 09:00 UTC**
+and on demand via `workflow_dispatch`.
+
+Each run:
+
+1. scans `main` and writes the JSON results to `.readme-badges/scorecard-results.json`
+   and a shields.io badge JSON to `.readme-badges/scorecard-badge.json` (paths
+   are the `BADGE_RESULTS_PATH` / `BADGE_JSON_PATH` env vars);
+2. force-pushes those files plus a `SCORECARD.md` summary table to the
+   **`openssf-update`** branch — a throwaway integration branch rebuilt from
+   `main` each run (the same pattern as a Dependabot update branch);
+3. opens an issue labelled `openssf` + `auto-update` with the score and the
+   sub-10 checks (or comments on the open one), carrying a **pre-filled
+   `compare?quick_pull=1` link**. Clicking it lands a PR that already has a
+   conventional title and `Closes #<issue>`, so a maintainer just reviews and
+   merges — `main` updates and the issue closes in one step.
+
+**The badge.** `publish_results` is deliberately off — publishing to the
+OpenSSF webapp forbids a workflow-level `env:` block. Instead the README badge
+is a shields.io *endpoint* badge that reads `scorecard-badge.json` straight
+from the `openssf-update` branch via `raw.githubusercontent.com`. It shows
+nothing until the workflow has run once on `main` and created that branch. A
+repo made from this template must point the badge URL at its own `owner/repo`.
 
 ## Layout
 
@@ -306,8 +432,11 @@ api/                      `backend` image source (python:slim + stdlib app.py)
 .containerignore          build-context excludes (.dockerignore -> symlink)
 .githooks/commit-msg           dispatcher git runs; execs the check script below
 .githooks/check-conventional-commit-msg   local Conventional Commits check (enabled by the shellHook)
+.github/actions/setup-devshell/   composite action: checkout-then-install-Nix, shared by workflows
 .github/workflows/ci.yml       flake eval + compose lint; `ci-required` aggregator gate
 .github/workflows/check-conventional-commit-pr-title.yml  PR title must be a Conventional Commit
+.github/workflows/check-pr-linked-issue.yml  every PR must close at least one issue
+.github/workflows/openssf-scorecard.yml  weekly OpenSSF Scorecard audit -> `openssf-update` branch + issue
 .github/rulesets/main.json     default-branch ruleset, in GitHub export format
 scripts/apply-governance.sh    apply the ruleset + merge/security settings via `gh`
 ```
@@ -328,6 +457,13 @@ scripts/apply-governance.sh    apply the ruleset + merge/security settings via `
 - **Bump nixpkgs**: change the `nixpkgs.url` ref in `flake.nix`, then
   `nix flake update`.
 - Rename this file's heading and delete this section once you've made it yours.
+
+## AI usage disclosure
+
+Parts of this repository were drafted with AI assistance by Claude Code.  
+Every AI-assisted change is reviewed and tested by a human. 
+This is tracked by AI-assisted commits carrying a `Co-Authored-By:` trailer naming  
+the assistant, alongside the human author who reviewed and committed them.
 
 ---
 
