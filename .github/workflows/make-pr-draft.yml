@@ -1,0 +1,28 @@
+name: Convert PR to Draft
+
+on:
+  pull_request:
+    types:
+      [ opened, reopened ]
+
+concurrency:
+  # Group by pull request
+  group: ${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  convert_to_draft:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Convert To Draft
+        uses: raviraipuria/convert-to-draft@v1.0.4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          days-before-convert-draft: 0
+          draft-pr-msg: 'This Pull Request was automatically converted to a draft. Please click "Ready For Review" and select reviewers whenever you are done coding.'
