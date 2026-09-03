@@ -28,6 +28,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "Dockerfile"
+      - ".dockerignore"
+      - ".containerignore"
       # release-please's own Release PR edits these. Listing them here is what
       # lets MERGING that PR re-trigger this workflow so it tags + publishes
       # the GitHub Release. Do not remove.
