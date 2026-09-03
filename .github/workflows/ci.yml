@@ -3,8 +3,35 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".gitignore"
+      - ".readme-badges/*"
+      - ".github/ISSUE_TEMPLATE/*"
+      - ".github/rulesets"
   pull_request:
+    paths:
+      # paths-ignore:
+      - "!*.md"
+      - "!.gitignore"
+      - "!.readme-badges/*"
+      # Application code + static assets -- an actual shippable change.
+      - "src/**"
+      - "**/*.js"
+      - "**/*.mjs"
+      - "**/*.cjs"
+      - "**/*.html"
+      - "**/*.css"
+      # Dependencies and the runtime image go into the release artifact.
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".containerignore"
+      - "flake.nix"
+      - "flake.lock" 
   workflow_dispatch: # allow a manual re-run from the Actions tab
+
 
 # Least privilege: this workflow only needs to read the repo contents.
 permissions:
