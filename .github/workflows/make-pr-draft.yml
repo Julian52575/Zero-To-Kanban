@@ -14,15 +14,30 @@ jobs:
   convert_to_draft:
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       pull-requests: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
       - name: Convert To Draft
-        uses: raviraipuria/convert-to-draft@v1.0.4
+        uses: actions/github-script@v7
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          days-before-convert-draft: 0
-          draft-pr-msg: 'This Pull Request was automatically converted to a draft. Please click "Ready For Review" and select reviewers whenever you are done coding.'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.draft) {
+              core.info('Pull request is already a draft, nothing to do.');
+              return;
+            }
+            await github.graphql(
+              `mutation($id: ID!) {
+                convertPullRequestToDraft(input: { pullRequestId: $id }) {
+                  pullRequest { isDraft }
+                }
+              }`,
+              { id: pr.node_id }
+            );
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: 'This Pull Request was automatically converted to a draft. Please click "Ready For Review" and select reviewers whenever you are done coding.',
+            });
