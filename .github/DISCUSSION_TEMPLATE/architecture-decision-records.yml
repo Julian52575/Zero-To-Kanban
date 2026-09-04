@@ -1,10 +1,11 @@
+title: ""
 body:
   - type: input
     id: date
     attributes:
       label: Date
       description: Date when the ADR was created.
-      placeholder: 2026-09-DD
+      placeholder: YYYY-MM-DD
     validations:
       required: true
 
@@ -55,7 +56,7 @@ body:
     attributes:
       label: Consequences
       description: What are the expected consequences, trade-offs, or risks?
-      placeholder: Optimization work required; no migration
+      placeholder: Optimization work required; no migration.
     validations:
       required: false
 
@@ -78,13 +79,13 @@ body:
       label: References
       description: Add relevant issues, pull requests, documentation, benchmarks, or external resources.
       placeholder: |
-        - Issue#123
+        - Issue #123
         - https://example.com/...
     validations:
       required: false
 
   - type: markdown
     attributes:
-      placeholder: |
-          ---
-          💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close this discussion.**
+      value: |
+        ---
+        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.**
