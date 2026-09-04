@@ -12,6 +12,14 @@ body:
         - label: I can reproduce this on the latest `main`
           required: true
 
+  - type: input
+    attributes:
+      label: ADR discussion
+      description: "Link to the Architecture Decision Record discussion this issue relates to. Browse or search them at https://github.com/Julian52575/Zero-To-Kanban/discussions/categories/architecture-decision-records?discussions_q="
+      placeholder: https://github.com/Julian52575/Zero-To-Kanban/discussions/...
+    validations:
+      required: true
+
   - type: textarea
     attributes:
       label: What's wrong
