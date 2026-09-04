@@ -1,0 +1,84 @@
+name: Architecture Decision Record Proposal
+description: Propose and document an architectural decision
+title: "[ADR] "
+
+body:
+  - type: input
+    id: date
+    attributes:
+      label: Date
+      description: Date when the ADR was created.
+      placeholder: 2026-09-DD
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Architecture Decision Record
+
+        Please complete every section below.
+        This discussion will document an architectural decision for the project.
+
+  - type: input
+    id: context
+    attributes:
+      label: Context
+      description: What situation requires a decision?
+      placeholder: Slowness observed in MySQL; a proposal was made to migrate to PostgreSQL.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: What are our options?
+      placeholder: |
+        1. Stay with MySQL and optimize
+        2. Migrate to PostgreSQL
+        3. Migrate to MongoDB
+    validations:
+      required: true
+
+  - type: dropdown
+    id: decision
+    attributes:
+      label: Decision
+      options:
+        - Proposed
+        - Accepted
+        - Rejected
+        - Superseded
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification
+      description: Why was this decision taken?
+      placeholder: High migration cost + team expertise in MySQL + gains are not guaranteed.
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: What are the expected consequences, trade-offs, or risks?
+      placeholder: Optimization work is required. Keeping MySQL.
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Add relevant issues, pull requests, documentation, benchmarks, or external resources.
+      placeholder: |
+        - #123
+        - https://example.com/...
+    validations:
+      required: false
