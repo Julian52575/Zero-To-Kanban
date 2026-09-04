@@ -83,8 +83,8 @@ body:
     validations:
       required: false
 
- - type: markdown
-    attributes:
-      value: |
-        ---
-        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close this discussion.**
+   - type: markdown
+      attributes:
+        value: |
+          ---
+          💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close this discussion.**
