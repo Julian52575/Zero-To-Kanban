@@ -1,7 +1,3 @@
-name: Architecture Decision Record Proposal
-description: Propose and document an architectural decision
-title: "[ADR] "
-
 body:
   - type: input
     id: date
@@ -11,14 +7,6 @@ body:
       placeholder: 2026-09-DD
     validations:
       required: true
-
-  - type: markdown
-    attributes:
-      value: |
-        ## Architecture Decision Record
-
-        Please complete every section below.
-        This discussion will document an architectural decision for the project.
 
   - type: input
     id: context
@@ -59,7 +47,6 @@ body:
     attributes:
       label: Justification
       description: Why was this decision taken?
-      placeholder: High migration cost + team expertise in MySQL + gains are not guaranteed.
     validations:
       required: false
 
@@ -68,7 +55,6 @@ body:
     attributes:
       label: Consequences
       description: What are the expected consequences, trade-offs, or risks?
-      placeholder: Optimization work is required. Keeping MySQL.
     validations:
       required: false
 
@@ -77,8 +63,5 @@ body:
     attributes:
       label: References
       description: Add relevant issues, pull requests, documentation, benchmarks, or external resources.
-      placeholder: |
-        - #123
-        - https://example.com/...
     validations:
       required: false
