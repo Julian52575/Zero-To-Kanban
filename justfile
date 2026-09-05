@@ -4,7 +4,7 @@ set shell := ["bash", "-eu", "-c"]
 # List available recipes
 default:
     @just --list
-    @echo "\nusing: {{tool}}"
+    @echo -e "\nusing '{{tool}}' as a container tool."
 
 #### Container
 
