@@ -22,3 +22,6 @@ result-*
 
 .claude
 .vscode
+
+# --- database dump ----------------------------------------------
+db_backup_*.sql
