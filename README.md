@@ -44,6 +44,8 @@ just nuke         #  nuke the containers, images and volumes after dumping the d
 just              #  list all available shortcuts
 ```
 
+Once up, the frontend can be accessed at `localhost:8000`.
+
 ### Working on the app
 
 **WIP**
