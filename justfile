@@ -35,8 +35,17 @@ rm *args:
 nuke *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    read -rp "Delete containers, images AND volumes for this project? type 'yes': " c
+    read -rp "⚠️  Delete containers, images AND volumes for this project? type 'yes': " c
     [[ "$c" == "yes" ]] || { echo "aborted"; exit 1; }
+    if ! just database-dump; then
+        echo "⚠️⚠️  database-dump FAILED -- the database volume is about to be deleted with no fresh backup!"
+        read -p "Type 'yes' to nuke anyway: " confirm
+        echo "$confirm"
+        if [ "$confirm" != "yes" ]; then
+            echo "Aborted."
+            exit 1
+        fi
+    fi
     {{compose}} down --volumes --remove-orphans {{args}}
     just rm
     echo "done"
