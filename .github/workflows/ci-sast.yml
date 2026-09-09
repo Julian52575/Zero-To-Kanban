@@ -1,0 +1,240 @@
+name: ci-sast
+
+# Static Application Security Testing -- external code-analysis services.
+#
+# Layout:
+#   guard            fast pre-check. If the branch head is one of
+#                    commit-reports' own commits, the scan + commit are turned
+#                    into a no-op that still reports success (not a skip), so
+#                    PAT-pushed report commits do not loop yet the required
+#                    checks stay green on the new SHA.
+#   <tool> jobs      run the scan, build .sast/report/<tool>/ (summary.md +
+#                    badge.svg + raw JSON), write the workflow job summary,
+#                    enforce that tool's gate, and stash the report as a
+#                    1-day artifact named sast-report-<tool>.
+#   commit-reports   collects every sast-report-* artifact and commits the
+#                    reports back to the branch in ONE commit, just before
+#                    ci-sast-required, using the SAST_REPORT_TOKEN PAT. That
+#                    push deliberately re-triggers ci / ci-sast on the new SHA
+#                    (so the required checks report on it and the PR can merge);
+#                    `guard` stops that second ci-sast run from committing
+#                    again. Never pushes to main -- reports reach main via the
+#                    PR merge.
+#   ci-sast-required single stable check for the branch ruleset (add a job to
+#                    its `needs` list to make that job mandatory).
+#
+# Draft pull requests are skipped -- SAST runs once the PR is marked ready.
+# Fork pull requests are skipped -- they cannot read SONARQUBE_TOKEN.
+#
+# Per-tool config lives under ./.sast/ :
+#   .sast/sonar-project.properties  -- SonarQube Cloud scan settings
+#   .sast/bin/sonar-report.sh       -- builds .sast/report/sonarqube/
+#
+# Secrets (repo Settings > Secrets and variables > Actions):
+#   SONARQUBE_TOKEN    -- SonarQube Cloud analysis token (scanner SONAR_TOKEN).
+#   SAST_REPORT_TOKEN  -- PAT with Contents: read and write. commit-reports
+#                         pushes the refreshed report with it, so the push
+#                         re-triggers CI on the new SHA.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".gitignore"
+      - ".github/ISSUE_TEMPLATE/*"
+      - ".github/rulesets"
+      - ".sast/report/**" # CI's own report commits -- do not re-trigger
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    # No path filter: for pull_request it is evaluated against the whole PR
+    # diff, so it cannot single out CI's own report commits. The `guard` job
+    # handles that instead.
+  workflow_dispatch: # allow a manual re-run from the Actions tab
+
+# Least privilege. commit-reports pushes with the SAST_REPORT_TOKEN PAT, not
+# GITHUB_TOKEN, so no job needs contents: write here.
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same PR (or branch); let every push to main
+# finish. Mirrors ci.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # commit-reports pushes with a PAT, which re-triggers this workflow. When the
+  # branch head is one of those report commits, `run` is 'false' and the tool
+  # jobs no-op to success instead of scanning + committing again -- so the run
+  # does not loop, and the required checks still report success on the new SHA.
+  guard:
+    name: Guard against self-triggered runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 1
+          persist-credentials: false
+      - id: check
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          subject=$(git log -1 --pretty=%s)
+          if [[ $EVENT == pull_request && $subject == "ci(sast): refresh SAST reports"* ]]; then
+            echo "head commit is a report refresh -- skipping SAST this run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  sonarqube:
+    name: SonarQube Cloud
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Runs on pushes to main and on same-repo, non-draft pull requests. When
+    # guard set run=false (a report-refresh follow-up) the job still runs but
+    # every real step is skipped -- it reports success without re-scanning.
+    if: >-
+      github.event_name != 'pull_request' ||
+      ( github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.full_name == github.repository )
+    steps:
+      - name: Report-refresh follow-up -- nothing to scan
+        if: needs.guard.outputs.run != 'true'
+        run: echo "Head commit is a SAST report refresh; the previous run already scanned this tree."
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: needs.guard.outputs.run == 'true'
+        with:
+          # Check out the real branch (not the detached PR merge ref) so the
+          # analysis reflects the branch head.
+          ref: ${{ github.head_ref || github.ref_name }}
+          # SonarQube wants full history for accurate new-code + blame data.
+          fetch-depth: 0
+          # This job does not push; commit-reports does.
+          persist-credentials: false
+
+      - name: SonarQube scan
+        if: needs.guard.outputs.run == 'true'
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          # The scanner reads SONAR_TOKEN; our secret is named SONARQUBE_TOKEN.
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+        with:
+          # Keep tool config out of the repo root.
+          args: -Dproject.settings=.sast/sonar-project.properties
+
+      - name: Build the branch-local report
+        id: report
+        if: needs.guard.outputs.run == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONAR_SCOPE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('pullRequest={0}', github.event.pull_request.number)
+                || format('branch={0}', github.ref_name) }}
+        run: bash .sast/bin/sonar-report.sh
+
+      - name: Stash the report for commit-reports
+        if: always() && needs.guard.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sast-report-sonarqube
+          path: .sast/report/sonarqube
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Enforce the Quality Gate
+        if: needs.guard.outputs.run == 'true' && steps.report.outputs.gate == 'failed'
+        run: |
+          echo "::error::SonarQube Quality Gate failed -- see the job summary"
+          exit 1
+
+  # One commit for every tool's report, just before ci-sast-required. Runs
+  # even if a tool job failed, so a red report is still published. On a
+  # report-refresh follow-up (guard run=false) every step is skipped and the
+  # job reports success without committing again.
+  commit-reports:
+    name: Commit SAST reports
+    needs: [guard, sonarqube]
+    if: >-
+      always() &&
+      github.ref_name != 'main' &&
+      ( github.event_name != 'pull_request' ||
+        ( github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository ) )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Report-refresh follow-up -- nothing to commit
+        if: needs.guard.outputs.run != 'true'
+        run: echo "Head commit is a SAST report refresh; reports are already current."
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: needs.guard.outputs.run == 'true'
+        with:
+          # SAST_REPORT_TOKEN (a PAT) is left in .git/config for the push. A
+          # PAT push re-triggers ci / ci-sast on the new SHA on purpose; the
+          # `guard` job turns that follow-up run into a no-op.
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.SAST_REPORT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Collect tool reports
+        if: needs.guard.outputs.run == 'true'
+        continue-on-error: true # nothing to collect if every tool job crashed early
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: sast-report-*
+          path: .sast/report
+
+      - name: Lay reports out under .sast/report/<tool>/
+        if: needs.guard.outputs.run == 'true'
+        run: |
+          shopt -s nullglob
+          for d in .sast/report/sast-report-*/; do
+            tool=${d#.sast/report/sast-report-}; tool=${tool%/}
+            rm -rf ".sast/report/${tool}"
+            mv "$d" ".sast/report/${tool}"
+          done
+
+      - name: Commit the reports back to the branch
+        if: needs.guard.outputs.run == 'true'
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .sast/report
+          if git diff --cached --quiet; then
+            echo "SAST reports unchanged."
+            exit 0
+          fi
+          git commit -m "ci(sast): refresh SAST reports for ${BRANCH}"
+          for attempt in 1 2 3; do
+            git push origin "HEAD:${BRANCH}" && exit 0
+            echo "push rejected (attempt ${attempt}); rebasing onto ${BRANCH}"
+            git pull --rebase --autostash origin "${BRANCH}" || break
+          done
+          echo "::warning::could not push the refreshed SAST reports; they will refresh on the next run"
+
+  # Passes when every needed job succeeded or was skipped; fails on
+  # failure/cancelled. Mirrors ci.yml's ci-required.
+  ci-sast-required:
+    if: always()
+    needs: [guard, sonarqube, commit-reports]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every required job passed
+        run: |
+          if printf '%s\n' '${{ join(needs.*.result, ' ') }}' | grep -Eqw 'failure|cancelled'; then
+            echo "a required job did not succeed: ${{ join(needs.*.result, ', ') }}"
+            exit 1
+          fi
