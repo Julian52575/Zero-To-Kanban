@@ -69,15 +69,20 @@ body:
       required: false
 
   - type: textarea
-    id: consequences
+    id: consequences-upside
     attributes:
-      label: Consequences
+      label: Consequences -- Upside
+      description: What are the expected benefits ?
+      placeholder: Fast database queries.
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences-tradeoff
+    attributes:
+      label: Consequences -- Trade-offs and risks
       description: What are the expected consequences, trade-offs, or risks?
-      placeholder: |
-        #### Trade-offs and risks
-        Optimization work required; no migration.
-        #### Upside
-        Fast database queries.
+      placeholder: Optimization work required; no migration.
     validations:
       required: false
 
