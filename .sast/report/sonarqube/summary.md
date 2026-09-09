@@ -1,6 +1,6 @@
-## SonarQube Cloud — PR #92
+## SonarQube Cloud — PR #60
 
-**Quality Gate: :x: Failed** · [Open in SonarQube Cloud](https://sonarcloud.io/summary/new_code?id=Julian52575_Zero-To-Kanban&pullRequest=92)
+**Quality Gate: :x: Failed** · [Open in SonarQube Cloud](https://sonarcloud.io/summary/new_code?id=Julian52575_Zero-To-Kanban&pullRequest=60)
 
 | Metric | Value |
 | --- | --- |
@@ -19,4 +19,4 @@
 | new_reliability_rating | GT | 1 | 3 |
 | new_coverage | LT | 80 | 0.0 |
 
-_Analysis `6a34e7b6-87c4-4fd9-97f3-45f24f54f3a2` · refreshed 2026-09-09T13:22:05Z._
+_Analysis `e29760a3-8dbc-4ff5-9d8a-302e80e539fc` · refreshed 2026-09-09T14:49:10Z._
