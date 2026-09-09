@@ -127,6 +127,7 @@ jobs:
           # The default GITHUB_TOKEN is left in .git/config for the push -- a
           # GITHUB_TOKEN push starts no new workflow run.
           ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.SAST_REPORT_TOKEN }}
           fetch-depth: 0
 
       - name: Collect tool reports
