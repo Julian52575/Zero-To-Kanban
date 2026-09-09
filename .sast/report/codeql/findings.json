@@ -1,7 +1,7 @@
 {
-  "generatedAt": null,
+  "generatedAt": "2026-09-09T13:22:13Z",
   "tool": "CodeQL",
-  "verdict": "unknown",
+  "verdict": "passed",
   "total": 0,
   "bySeverity": {
     "error": 0,

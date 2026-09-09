@@ -1,6 +1,11 @@
-## CodeQL — pending
+## CodeQL — PR #92
 
-CodeQL has not produced a report on this branch yet. It runs in
-[`ci-sast.yml`](../../../.github/workflows/ci-sast.yml) on the next
-non-draft pull-request event or push to `main`; the `commit-reports` job then
-overwrites this file with the real digest.
+**Result: :white_check_mark: Passed** · 0 alert(s) · [Workflow run](https://github.com/Julian52575/Zero-To-Kanban/actions/runs/34356510292)
+
+| Severity | Count |
+| --- | --- |
+| Error | 0 |
+| Warning | 0 |
+| Note | 0 |
+
+_Scanned CodeQL · refreshed 2026-09-09T13:22:13Z._

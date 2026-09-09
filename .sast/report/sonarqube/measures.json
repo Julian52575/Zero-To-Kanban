@@ -1,6 +1,6 @@
 {
   "component": {
-    "id": "AaCFRJJ4PT2u2bv4MRq8",
+    "id": "AaCGVMENsmN_WM9NOU7M",
     "key": "Julian52575_Zero-To-Kanban",
     "name": "Zero-To-Kanban",
     "qualifier": "TRK",
@@ -59,6 +59,6 @@
         "bestValue": true
       }
     ],
-    "pullRequest": "85"
+    "pullRequest": "92"
   }
 }
