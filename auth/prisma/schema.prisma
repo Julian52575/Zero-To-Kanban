@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TEMPORARY shape: username only, no credentials. A session is minted for
+// whatever username is submitted (created on first use). `tokenVersion` still
+// backs revocation -- see src/revocation.js.
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+
+  // Bumped on "log out everywhere". Every session JWT carries the value it was
+  // minted with (`ver`); /internal/verify rejects a token whose `ver` no
+  // longer matches the row.
+  tokenVersion Int      @default(0) @map("token_version")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

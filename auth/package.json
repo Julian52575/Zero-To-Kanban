@@ -1,0 +1,37 @@
+{
+  "name": "auth",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "nodemon -L src/index.js",
+    "start": "node src/index.js",
+    "test": "jest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "prisma": "^6.5.0"
+  },
+  "comment_overrides": "prisma CLI (dev-only) pins vulnerable deepmerge-ts <8 via @prisma/config; no released prisma fixes it yet -- GHSA-ggr8-5vv4-36mx",
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/spec/**/*.spec.js"
+    ],
+    "setupFiles": [
+      "<rootDir>/spec/setup.js"
+    ]
+  }
+}

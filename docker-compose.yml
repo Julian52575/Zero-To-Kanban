@@ -2,13 +2,21 @@
 #
 #   http://localhost:8000/           -> frontend (Vite dev server, ./frontend)
 #   http://localhost:8000/items      -> backend  (Express API, ./backend)
+#   http://localhost:8000/login      -> auth     (username-only sign-in page, ./auth)
+#   http://localhost:8000/auth/*     -> auth     (login, logout, logout-all, me)
 #   http://localhost:8080/           -> Traefik dashboard (insecure, local only)
+#
+# Every route EXCEPT the auth ones above is guarded by the `require-login`
+# ForwardAuth middleware: Traefik calls auth:/internal/verify first and only
+# proxies the request on a 2xx, injecting a trusted X-Auth-User-Id header.
+# An unauthenticated browser hit is redirected to /login; an API call gets 401.
+# Fail-closed: if the `auth` service is down, guarded routes return 5xx.
 #
 # Traefik discovers routes from each container's `traefik.*` labels through
 # the Podman API socket that the Nix dev shell exposes as $DOCKER_SOCK.
-# `just up` builds images on first run; after editing ./backend, ./frontend or
-# a Dockerfile run `just rm; just up` to force a clean rebuild (podman-compose's
-# `--build` often misses a changed COPY).
+# `just up` builds images on first run; after editing ./backend, ./frontend,
+# ./auth or a Dockerfile run `just rm; just up` to force a clean rebuild
+# (podman-compose's `--build` often misses a changed COPY).
 
 services:
   proxy:
@@ -27,6 +35,25 @@ services:
     volumes:
       - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro"
     restart: unless-stopped
+    labels:
+      # Middleware DEFINITIONS live on the proxy -- the first container up --
+      # so they are registered before the frontend/backend routers reference
+      # them (avoids a transient `middleware "require-login@docker" does not
+      # exist` at boot). `traefik.enable=true` is required for Traefik to read
+      # its own container's labels while exposedbydefault=false; no router rule
+      # is defined here, so nothing about the proxy gets exposed.
+      - traefik.enable=true
+
+      # ForwardAuth: Traefik calls this on each guarded request; the 2xx
+      # response's headers are copied onto the upstream request.
+      - traefik.http.middlewares.require-login.forwardauth.address=http://auth:4000/internal/verify
+      - traefik.http.middlewares.require-login.forwardauth.authResponseHeaders=X-Auth-User-Id,X-Auth-User-Name
+      - traefik.http.middlewares.require-login.forwardauth.trustForwardHeader=true
+
+      # Strip any client-supplied identity headers so ONLY ForwardAuth can set
+      # them. Chained before require-login on each guarded router.
+      - traefik.http.middlewares.strip-identity.headers.customRequestHeaders.X-Auth-User-Id=
+      - traefik.http.middlewares.strip-identity.headers.customRequestHeaders.X-Auth-User-Name=
 
   db:
     image: docker.io/library/postgres:16-alpine
@@ -38,10 +65,60 @@ services:
       - todo-db-data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo} -d ${POSTGRES_DB:-todo}"]
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 5s
+
+  # The login service owns its own database -- separate blast radius, separate
+  # migrations and backups from the app data in `db`, and its own credentials
+  # (AUTH_POSTGRES_*) so a leak of one set does not grant access to the other.
+  authdb:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${AUTH_POSTGRES_USER:-authuser}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD:-authpass}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB:-auth}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER:-authuser} -d ${AUTH_POSTGRES_DB:-auth}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  auth:
+    build:
+      context: ./auth
+    environment:
+      DATABASE_URL: postgresql://${AUTH_POSTGRES_USER:-authuser}:${AUTH_POSTGRES_PASSWORD:-authpass}@authdb:5432/${AUTH_POSTGRES_DB:-auth}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env (openssl rand -hex 32)}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      authdb:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+
+      # Public router: the /login page + the /auth/* API. NO guard here, or the
+      # login form itself would be unreachable. Priority sits above the backend
+      # /items router (10) and the frontend catch-all (1). The rule does NOT
+      # match /internal, so /internal/verify stays proxy-only.
+      #
+      # The `require-login` / `strip-identity` middlewares this stack uses are
+      # defined on the `proxy` service, not here.
+      - traefik.http.routers.auth.rule=PathPrefix(`/auth`) || Path(`/login`)
+      - traefik.http.routers.auth.priority=100
+      - traefik.http.services.auth.loadbalancer.server.port=4000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:4000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 3
       start_period: 5s
 
   backend:
@@ -52,14 +129,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Start `auth` before the services it guards, so ForwardAuth has a target
+      # and guarded routes don't fail closed during the gap. (The middleware
+      # definitions themselves live on the `proxy` service.)
+      auth:
+        condition: service_started
     labels:
       - traefik.enable=true
       - traefik.http.routers.backend.rule=PathPrefix(`/items`)
       - traefik.http.routers.backend.priority=10
       - traefik.http.services.backend.loadbalancer.server.port=3000
+      # Guard: strip spoofed identity headers, then require a valid session.
+      - traefik.http.routers.backend.middlewares=strip-identity@docker,require-login@docker
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/items', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -68,12 +152,20 @@ services:
   frontend:
     build:
       context: ./frontend
+    depends_on:
+      # Start `auth` first so ForwardAuth has a target when this router serves
+      # its first request. (Middleware definitions live on the `proxy` service.)
+      auth:
+        condition: service_started
     labels:
       - traefik.enable=true
       - traefik.http.routers.frontend.rule=PathPrefix(`/`)
       - traefik.http.routers.frontend.priority=1        # catch-all: lowest priority
       - traefik.http.services.frontend.loadbalancer.server.port=5173
+      # Guard: same as backend -- an unauthenticated hit is redirected to /login.
+      - traefik.http.routers.frontend.middlewares=strip-identity@docker,require-login@docker
     restart: unless-stopped
 
 volumes:
   todo-db-data:
+  auth-db-data:

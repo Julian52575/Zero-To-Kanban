@@ -99,10 +99,66 @@ jobs:
           npm start &
           trap 'kill $!' EXIT
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:3000/items > /dev/null && exit 0
+            curl -sf http://127.0.0.1:3000/healthz > /dev/null && exit 0
             sleep 1
           done
           echo "backend did not respond on :3000 in time" >&2
+          exit 1
+
+  # Runs alongside `backend`/`frontend`. Mirrors the `backend` job: unit tests,
+  # then apply migrations and smoke-test the running service.
+  auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: auth
+    services:
+      postgres:
+        image: docker.io/library/postgres:16-alpine
+        env:
+          POSTGRES_USER: authuser
+          POSTGRES_PASSWORD: authpass
+          POSTGRES_DB: auth
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U authuser -d auth"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://authuser:authpass@localhost:5432/auth?schema=public
+      SESSION_SECRET: ci-only-secret-not-used-anywhere-real
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: auth/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Start the service and check it responds
+        run: |
+          npm start &
+          trap 'kill $!' EXIT
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4000/healthz > /dev/null && exit 0
+            sleep 1
+          done
+          echo "auth did not respond on :4000 in time" >&2
           exit 1
 
   # Runs alongside `backend` (no `needs` between them = parallel scheduling).
@@ -172,7 +228,7 @@ jobs:
   # Add a job to `needs` here to make it mandatory to the branch ruleset.
   ci-required:
     if: always()
-    needs: [devshell, backend, frontend, database]
+    needs: [devshell, backend, frontend, database, auth]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

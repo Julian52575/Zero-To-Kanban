@@ -1,12 +1,21 @@
 const express = require('express');
 const app = express();
 const db = require('./persistence');
+const requireUser = require('./middleware/requireUser');
 const getItems = require('./routes/getItems');
 const addItem = require('./routes/addItem');
 const updateItem = require('./routes/updateItem');
 const deleteItem = require('./routes/deleteItem');
 
 app.use(express.json());
+
+// Unauthenticated liveness probe (container healthcheck / CI). Must stay
+// above requireUser.
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+
+// Everything below needs an identity asserted by the auth service and passed
+// through by Traefik's ForwardAuth middleware.
+app.use(requireUser);
 
 app.get('/items', getItems);
 app.post('/items', addItem);

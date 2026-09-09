@@ -19,6 +19,7 @@
             just
             jq
             nodejs_24
+            openssl # dev shell seeds .env's SESSION_SECRET (openssl rand -hex 32)
             # rootless podman stack
             podman
             podman-compose
@@ -32,6 +33,26 @@
           ];
 
           shellHook = ''
+            # --- auth: SESSION_SECRET ------------------------------------
+            if [ ! -e .env ] && [ -f .env.example ]; then
+              cp .env.example .env && echo "env: created .env from .env.example"
+            fi
+            if command -v openssl >/dev/null 2>&1; then
+              [ -e .env ] || touch .env
+              cur="$(grep -E '^SESSION_SECRET=' .env 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"' || true)"
+              case "$cur" in
+                "" | change-me-*)
+                  secret="$(openssl rand -hex 32)"
+                  if grep -qE '^SESSION_SECRET=' .env; then
+                    sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$secret|" .env
+                  else
+                    printf 'SESSION_SECRET=%s\n' "$secret" >> .env
+                  fi
+                  echo "env: generated SESSION_SECRET (openssl rand -hex 32)"
+                  ;;
+              esac
+            fi
+
             # --- .env (optional) -------------------------------------------
             if [ -f .env ]; then
               set -a
