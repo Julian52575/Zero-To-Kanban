@@ -3,11 +3,14 @@ name: ci-sast
 # Static Application Security Testing -- external code-analysis services.
 #
 # Layout:
-#   guard            fast pre-check. If the branch head is one of
-#                    commit-reports' own commits, the scan + commit are turned
-#                    into a no-op that still reports success (not a skip), so
-#                    PAT-pushed report commits do not loop yet the required
-#                    checks stay green on the new SHA.
+#   guard            fast pre-check. Decides whether the tool jobs actually
+#                    scan (run=true) or no-op to success with the reason
+#                    written to the job summary (run=false). run=false when the
+#                    branch head is one of commit-reports' own report commits,
+#                    the PR is a draft, or the PR is from a fork (no
+#                    SONARQUBE_TOKEN). A no-op, not a skip, so PAT-pushed report
+#                    commits do not loop yet the required checks stay green on
+#                    the new SHA.
 #   <tool> jobs      run the scan, build .sast/report/<tool>/ (summary.md +
 #                    badge.svg + raw JSON), write the workflow job summary,
 #                    enforce that tool's gate, and stash the report as a
@@ -25,6 +28,8 @@ name: ci-sast
 #
 # Draft pull requests are skipped -- SAST runs once the PR is marked ready.
 # Fork pull requests are skipped -- they cannot read SONARQUBE_TOKEN.
+# In both cases `guard` turns the run into a run=false no-op and records the
+# reason in the job summary, rather than skipping the jobs silently.
 #
 # Per-tool config lives under ./.sast/ :
 #   .sast/sonar-project.properties  -- SonarQube Cloud scan settings
@@ -65,15 +70,19 @@ concurrency:
 
 jobs:
   # commit-reports pushes with a PAT, which re-triggers this workflow. When the
-  # branch head is one of those report commits, `run` is 'false' and the tool
-  # jobs no-op to success instead of scanning + committing again -- so the run
-  # does not loop, and the required checks still report success on the new SHA.
+  # branch head is one of those report commits -- or the PR is a draft, or from
+  # a fork where SONARQUBE_TOKEN is unavailable -- `run` is 'false' and the tool
+  # jobs no-op to success (writing the reason to the job summary) instead of
+  # scanning + committing. So the run does not loop, drafts/forks are skipped
+  # visibly rather than silently, and the required checks still report success
+  # on the new SHA.
   guard:
     name: Guard against self-triggered runs
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
       run: ${{ steps.check.outputs.run }}
+      reason: ${{ steps.check.outputs.reason }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -83,13 +92,26 @@ jobs:
       - id: check
         env:
           EVENT: ${{ github.event_name }}
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
         run: |
           subject=$(git log -1 --pretty=%s)
           if [[ $EVENT == pull_request && $subject == "ci(sast): refresh SAST reports"* ]]; then
-            echo "head commit is a report refresh -- skipping SAST this run"
+            reason="Head commit is a SAST report refresh; the previous run already scanned this tree."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [[ $IS_FORK == true ]]; then
+            reason="Fork pull request -- SONARQUBE_TOKEN is not exposed to forks, so SonarQube cannot run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [[ $IS_DRAFT == true ]]; then
+            reason="Draft pull request -- SAST runs once the PR is marked ready for review."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
+            reason=""
             echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+          if [[ -n $reason ]]; then
+            echo "$reason"
           fi
 
   sonarqube:
@@ -97,17 +119,21 @@ jobs:
     needs: [guard]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Runs on pushes to main and on same-repo, non-draft pull requests. When
-    # guard set run=false (a report-refresh follow-up) the job still runs but
-    # every real step is skipped -- it reports success without re-scanning.
-    if: >-
-      github.event_name != 'pull_request' ||
-      ( github.event.pull_request.draft == false &&
-        github.event.pull_request.head.repo.full_name == github.repository )
+    # Always runs. When guard set run=false (a report-refresh follow-up, a
+    # draft PR, or a fork PR with no SONARQUBE_TOKEN) every real step is
+    # skipped and the job reports success with the reason written to the job
+    # summary instead of scanning.
     steps:
-      - name: Report-refresh follow-up -- nothing to scan
+      - name: Not scanning this run -- explain in the job summary
         if: needs.guard.outputs.run != 'true'
-        run: echo "Head commit is a SAST report refresh; the previous run already scanned this tree."
+        env:
+          REASON: ${{ needs.guard.outputs.reason }}
+        run: |
+          {
+            echo "### SonarQube Cloud — not run"
+            echo
+            echo "${REASON:-Guard set run=false for this run.}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: needs.guard.outputs.run == 'true'
@@ -157,24 +183,26 @@ jobs:
           exit 1
 
   # One commit for every tool's report, just before ci-sast-required. Runs
-  # even if a tool job failed, so a red report is still published. On a
-  # report-refresh follow-up (guard run=false) every step is skipped and the
-  # job reports success without committing again.
+  # even if a tool job failed, so a red report is still published. When guard
+  # set run=false (report refresh, draft PR, or fork PR) every step is skipped
+  # and the job reports success without committing again.
   commit-reports:
     name: Commit SAST reports
     needs: [guard, sonarqube]
-    if: >-
-      always() &&
-      github.ref_name != 'main' &&
-      ( github.event_name != 'pull_request' ||
-        ( github.event.pull_request.draft == false &&
-          github.event.pull_request.head.repo.full_name == github.repository ) )
+    if: always() && github.ref_name != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Report-refresh follow-up -- nothing to commit
+      - name: Nothing to commit this run -- explain in the job summary
         if: needs.guard.outputs.run != 'true'
-        run: echo "Head commit is a SAST report refresh; reports are already current."
+        env:
+          REASON: ${{ needs.guard.outputs.reason }}
+        run: |
+          {
+            echo "### Commit SAST reports — not run"
+            echo
+            echo "${REASON:-Guard set run=false for this run.}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: needs.guard.outputs.run == 'true'
