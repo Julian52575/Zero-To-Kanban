@@ -191,9 +191,12 @@ jobs:
   # data Dependabot uses, resolved from the pull-request branch's own
   # package-lock.json rather than from `main` (all the Dependabot alerts API can
   # report on). Software-composition analysis, not SAST, so it lives here and
-  # not in ci-sast.yml. Informational: it surfaces the counts in the job summary
-  # and uploads the raw reports, but a known-vulnerable transitive dependency
-  # does not fail the build.
+  # not in ci-sast.yml.
+  #
+  # Gate (both workspaces combined): fails on any Critical or High advisory, or
+  # on 5 or more Moderate+Low. Also fails if `npm audit` cannot be completed --
+  # an unknown posture is not a passing one. The counts and every advisory land
+  # in the job summary, and the raw reports upload as an artifact, pass or fail.
   dependencies-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -214,6 +217,29 @@ jobs:
           set -euo pipefail
           mkdir -p dependency-audit
 
+          # --- collect `npm audit` for each workspace, retrying transient failures ---
+          audit_ok=1
+          for ws in backend frontend; do
+            raw="dependency-audit/${ws}.json"
+            for attempt in 1 2 3; do
+              # npm audit exits non-zero when it finds advisories -- that is
+              # still a valid report, so judge the JSON body, not the status.
+              ( cd "$ws" && npm audit --json ) > "$raw" 2>/dev/null || true
+              jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1 && break
+              [ "$attempt" -lt 3 ] && sleep 3 || true
+            done
+            if ! jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
+              audit_ok=0
+              echo "::error::npm audit produced no usable report for ${ws}"
+              echo '{}' > "$raw"   # keep the file valid JSON for the steps below
+            fi
+          done
+
+          # --- totals across every workspace that reported ---
+          sev() { jq -s --arg k "$1" '[ .[].metadata.vulnerabilities[$k] // 0 ] | add // 0' dependency-audit/*.json; }
+          crit=$(sev critical); high=$(sev high); mod=$(sev moderate); low=$(sev low)
+          ch=$((crit + high)); ml=$((mod + low))
+
           {
             echo "### Dependency audit (\`npm audit\`)"
             echo
@@ -223,17 +249,16 @@ jobs:
             echo '| --- | --- | --- | --- | --- | --- |'
             for ws in backend frontend; do
               raw="dependency-audit/${ws}.json"
-              # npm audit exits non-zero when it finds anything -- not an error here.
-              ( cd "$ws" && npm audit --json ) > "$raw" 2>/dev/null || true
-              if ! jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
+              if jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
+                jq -r --arg ws "$ws" '.metadata.vulnerabilities
+                  | "| `\($ws)` | \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"' "$raw"
+              else
                 echo "| \`$ws\` | ? | ? | ? | ? | npm audit failed |"
-                echo "::warning::npm audit produced no usable report for $ws" >&2
-                continue
               fi
-              jq -r --arg ws "$ws" '.metadata.vulnerabilities
-                | "| `\($ws)` | \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"' "$raw"
             done
 
+            echo
+            echo "**Gate:** any Critical or High fails; 5 or more Moderate+Low fails. Found **${crit}** Critical, **${high}** High, **${ml}** Moderate+Low."
             echo
             echo '<details><summary>Advisories</summary>'
             echo
@@ -258,6 +283,24 @@ jobs:
             echo
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # --- gate ---
+          if [ "$audit_ok" -ne 1 ]; then
+            echo "::error::dependency audit incomplete -- an unknown posture cannot clear the gate"
+            exit 1
+          fi
+          rc=0
+          if [ "$ch" -gt 0 ]; then
+            echo "::error::${crit} critical + ${high} high dependency vulnerabilities found (allowed: 0)"
+            echo "::error::Please refer to the workflow summary for details"
+            rc=1
+          fi
+          if [ "$ml" -ge 5 ]; then
+            echo "::error::${ml} moderate + low dependency vulnerabilities found (allowed: fewer than 5)"
+            echo "::error::Please refer to the workflow summary for details"
+            rc=1
+          fi
+          exit "$rc"
 
       - name: Upload the raw audit reports
         if: always()
