@@ -6,14 +6,21 @@ Config, helper scripts and branch-local reports for the jobs in
 ```
 .sast/
 ├── sonar-project.properties   SonarQube Cloud scan settings
+├── codeql-config.yml          CodeQL paths / query suite
 ├── bin/
-│   └── sonar-report.sh        builds report/sonarqube/ from a finished analysis
+│   ├── sonar-report.sh        builds report/sonarqube/ from a finished analysis
+│   └── codeql-report.sh       builds report/codeql/ from the analyze SARIF
 └── report/
-    └── sonarqube/             refreshed by CI, committed to the branch
+    ├── sonarqube/             refreshed by CI, committed to the branch
+    │   ├── summary.md         human-readable digest (also the job summary)
+    │   ├── badge.svg          gate badge, shown in the root README
+    │   ├── measures.json      raw metric values
+    │   └── quality-gate.json  raw gate status + failing conditions
+    └── codeql/                refreshed by CI, committed to the branch
         ├── summary.md         human-readable digest (also the job summary)
-        ├── badge.svg          gate badge, shown in the root README
-        ├── measures.json      raw metric values
-        └── quality-gate.json  raw gate status + failing conditions
+        ├── badge.svg          verdict badge, shown in the root README
+        ├── findings.json      normalised findings + counts by severity
+        └── results.sarif      raw CodeQL SARIF (all languages merged)
 ```
 
 ## How the report stays current
@@ -64,3 +71,36 @@ One-time setup:
 The full analysis (issues, hotspots, history) stays in the SonarQube Cloud UI;
 `report/sonarqube/` is just the at-a-glance record. The job fails if the
 project's **Quality Gate** does not pass.
+
+## CodeQL
+
+Runs entirely inside the workflow — `github/codeql-action/init` +
+`analyze` with **`build-mode: none`** (JavaScript/TypeScript needs no build) and
+**`upload: never`**, so it depends on neither GitHub Advanced Security nor code
+scanning being enabled and the `codeql` job needs only `contents: read`.
+
+`bin/codeql-report.sh` parses the SARIF `analyze` writes to
+`.sast/codeql-results/` (git-ignored scratch) into `report/codeql/`:
+
+- **`findings.json`** — every result normalised to
+  `{ ruleId, name, level, securitySeverity, message, file, line }`, plus
+  `bySeverity` counts and a `verdict`.
+- **`summary.md`** — the digest, also written to the workflow job summary.
+- **`badge.svg`** — `passed` (green) / `warning` (yellow) / `failed` (red),
+  referenced by `README.md` via a relative path.
+- **`results.sarif`** — the raw SARIF, kept so it can be uploaded later by hand.
+
+**Gate:** the job fails when any **error-severity** result is present (CodeQL
+marks high/critical security issues as `error`). Warning- and note-severity
+results are recorded but do not block, mirroring the SonarQube job.
+
+What to scan and which query suite live in
+[`codeql-config.yml`](./codeql-config.yml) — `paths` mirrors
+`sonar-project.properties`' `sonar.sources`.
+
+To also publish findings to the repo's **Security → Code scanning** tab, set
+`upload: always` on the `Analyze` step and add `security-events: write` to the
+`codeql` job's `permissions`. If GitHub's **default setup** for code scanning is
+enabled it must be turned off first (*Settings → Code security → Code scanning →
+Set up → Advanced*), the same way SonarQube Cloud's Automatic Analysis has to be
+off — an advanced workflow and default setup cannot both run.

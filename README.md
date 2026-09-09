@@ -1,5 +1,6 @@
 [![OpenSSF Scorecard](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJulian52575%2FZero-To-Kanban%2Fmain%2F.readme-badges%2Fscorecard-badge.json)](.readme-badges/scorecard-results.json)
 [![SonarQube Quality Gate](.sast/report/sonarqube/badge.svg)](.sast/report/sonarqube/summary.md)
+[![CodeQL](.sast/report/codeql/badge.svg)](.sast/report/codeql/summary.md)
 
 # Zero-To-Kaban
 
