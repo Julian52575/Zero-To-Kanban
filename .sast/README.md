@@ -30,14 +30,17 @@ That commit is pushed with the **`SAST_REPORT_TOKEN`** PAT (Contents: read and
 write), so — unlike a `GITHUB_TOKEN` push — it re-triggers `ci` and `ci-sast`
 on the new commit. That is deliberate: the required checks must report on the
 head SHA or the PR softlocks. The follow-up `ci-sast` run would otherwise scan
-and commit again, so a `guard` job at the top of the workflow detects that the
-branch head is a `ci(sast): refresh SAST reports…` commit and skips the scan +
-commit — the loop stops after one extra (near-instant) run.
+and commit again, so a `guard` job detects that the branch head is a
+`ci(sast): refresh SAST reports…` commit: the tool jobs then run but skip every
+real step, **reporting success without re-scanning**. The loop stops after one
+extra (near-instant) run, and every check stays green on the new SHA.
 
-**Skipped runs:** report-refresh commits (via `guard`), draft pull requests
-(SAST runs once the PR is marked ready), and pull requests from forks (no
-`SONARQUBE_TOKEN`). In each case the tool jobs and `commit-reports` are
-skipped, and `ci-sast-required` stays green.
+**No-scan runs:** report-refresh commits — the tool jobs and `commit-reports`
+run to green as a no-op.
+
+**Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
+and pull requests from forks (no `SONARQUBE_TOKEN`) — the tool jobs and
+`commit-reports` are skipped and `ci-sast-required` stays green.
 
 ## SonarQube Cloud
 
