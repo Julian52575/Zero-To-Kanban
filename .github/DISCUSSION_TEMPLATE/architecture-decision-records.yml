@@ -74,10 +74,10 @@ body:
       label: Consequences
       description: What are the expected consequences, trade-offs, or risks?
       placeholder: |
-      #### Trade-offs and risks
-      Optimization work required; no migration.
-      #### Upside
-      Fast database queries.
+        #### Trade-offs and risks
+        Optimization work required; no migration.
+        #### Upside
+        Fast database queries.
     validations:
       required: false
 
