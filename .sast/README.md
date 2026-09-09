@@ -26,14 +26,18 @@ the files — and the README badge, which references `badge.svg` by a **relative
 path** — always reflect the branch you are viewing. The record reaches `main`
 only when the PR merges; CI never pushes to `main`.
 
-That commit is made with the default `GITHUB_TOKEN` and its message carries
-`[skip ci]`, so it starts **no** further workflow run (GITHUB_TOKEN pushes
-never trigger `push` / `pull_request` workflows; `.sast/report/**` is also in
-the relevant `paths-ignore` lists).
+That commit is pushed with the **`SAST_REPORT_TOKEN`** PAT (Contents: read and
+write), so — unlike a `GITHUB_TOKEN` push — it re-triggers `ci` and `ci-sast`
+on the new commit. That is deliberate: the required checks must report on the
+head SHA or the PR softlocks. The follow-up `ci-sast` run would otherwise scan
+and commit again, so a `guard` job at the top of the workflow detects that the
+branch head is a `ci(sast): refresh SAST reports…` commit and skips the scan +
+commit — the loop stops after one extra (near-instant) run.
 
-**Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
-and pull requests from forks (no `SONARQUBE_TOKEN`). In both cases the tool
-jobs and `commit-reports` are skipped, and `ci-sast-required` stays green.
+**Skipped runs:** report-refresh commits (via `guard`), draft pull requests
+(SAST runs once the PR is marked ready), and pull requests from forks (no
+`SONARQUBE_TOKEN`). In each case the tool jobs and `commit-reports` are
+skipped, and `ci-sast-required` stays green.
 
 ## SonarQube Cloud
 
@@ -48,7 +52,10 @@ One-time setup:
    `SONARQUBE_TOKEN` Actions secret.
 4. Put the org key and project key into `sonar-project.properties` (the
    `REPLACE_WITH_*` placeholders).
-5. Let one run land on `main` first — SonarQube Cloud needs a base-branch
+5. Add a **`SAST_REPORT_TOKEN`** Actions secret — a PAT with *Contents: read
+   and write* on this repo — so `commit-reports` can push the refreshed report
+   in a way that re-triggers CI on the new commit.
+6. Let one run land on `main` first — SonarQube Cloud needs a base-branch
    analysis before it can decorate pull requests.
 
 The full analysis (issues, hotspots, history) stays in the SonarQube Cloud UI;
