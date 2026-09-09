@@ -45,8 +45,10 @@ extra (near-instant) run, and every check stays green on the new SHA.
 **No-scan runs:** report-refresh commits — the tool jobs and `commit-reports`
 run to green as a no-op.
 
-**Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
-and pull requests from forks (no `SONARQUBE_TOKEN`) — the tool jobs and
+**Skipped runs:** draft pull requests (SAST runs once the PR is marked ready),
+pull requests from forks (no `SONARQUBE_TOKEN`), and Dependabot pull requests
+(Actions secrets are withheld from Dependabot, so `SONARQUBE_TOKEN` is
+unavailable — SAST runs when the bump merges to `main`) — the tool jobs and
 `commit-reports` are skipped and `ci-sast-required` stays green.
 
 ## SonarQube Cloud

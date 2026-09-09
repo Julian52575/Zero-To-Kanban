@@ -34,6 +34,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Require at least one linked (closing) issue
+        # Dependabot opens dependency PRs that have no issue to close. They are
+        # still gated by review + the other required checks. Skipping the only
+        # step lets the job -- and this required check -- report success.
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |

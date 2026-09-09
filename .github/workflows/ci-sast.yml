@@ -28,7 +28,9 @@ name: ci-sast
 #
 # Draft pull requests are skipped -- SAST runs once the PR is marked ready.
 # Fork pull requests are skipped -- they cannot read SONARQUBE_TOKEN.
-# In both cases `guard` turns the run into a run=false no-op and records the
+# Dependabot pull requests are skipped -- Actions secrets are withheld from
+# Dependabot, so SONARQUBE_TOKEN is unavailable; SAST runs on merge to main.
+# In every case `guard` turns the run into a run=false no-op and records the
 # reason in the job summary, rather than skipping the jobs silently.
 #
 # Per-tool config lives under ./.sast/ :
@@ -77,10 +79,11 @@ concurrency:
 
 jobs:
   # commit-reports pushes with a PAT, which re-triggers this workflow. When the
-  # branch head is one of those report commits -- or the PR is a draft, or from
-  # a fork where SONARQUBE_TOKEN is unavailable -- `run` is 'false' and the tool
-  # jobs no-op to success (writing the reason to the job summary) instead of
-  # scanning + committing. So the run does not loop, drafts/forks are skipped
+  # branch head is one of those report commits -- or the PR is a draft, from a
+  # fork, or opened by Dependabot (all three cases have no access to the
+  # SONARQUBE_TOKEN Actions secret) -- `run` is 'false' and the tool jobs no-op
+  # to success (writing the reason to the job summary) instead of scanning +
+  # committing. So the run does not loop, drafts/forks/Dependabot are skipped
   # visibly rather than silently, and the required checks still report success
   # on the new SHA.
   guard:
@@ -101,6 +104,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          IS_DEPENDABOT: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: |
           subject=$(git log -1 --pretty=%s)
           if [[ $EVENT == pull_request && $subject == "ci(sast): refresh SAST reports"* ]]; then
@@ -108,6 +112,9 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
           elif [[ $IS_FORK == true ]]; then
             reason="Fork pull request -- SONARQUBE_TOKEN is not exposed to forks, so SonarQube cannot run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [[ $IS_DEPENDABOT == true ]]; then
+            reason="Dependabot pull request -- Actions secrets (SONARQUBE_TOKEN) are not exposed to Dependabot, so SonarQube cannot run. SAST runs on merge to main."
             echo "run=false" >> "$GITHUB_OUTPUT"
           elif [[ $IS_DRAFT == true ]]; then
             reason="Draft pull request -- SAST runs once the PR is marked ready for review."

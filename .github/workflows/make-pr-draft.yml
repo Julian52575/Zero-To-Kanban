@@ -13,6 +13,9 @@ concurrency:
 jobs:
   convert_to_draft:
     runs-on: ubuntu-latest
+    # Dependabot PRs are machine-generated and reviewed as-is; don't send them
+    # back to draft.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     permissions:
       contents: write
       pull-requests: write

@@ -1,0 +1,121 @@
+# Dependabot -- dependency analysis and update PRs.
+#
+# Two things run off this repo, only one of which this file controls:
+#
+#   Security updates  -- already enabled in repo Settings > Code security
+#                        ("Dependabot security updates"). Dependabot watches the
+#                        GitHub Advisory Database and opens a PR whenever a
+#                        manifest/lockfile here pulls in a vulnerable version.
+#                        That happens with or without this file.
+#   Version updates   -- THIS file. A scheduled sweep that opens PRs to move
+#                        dependencies to the latest allowed version, vulnerable
+#                        or not, so the security PRs above stay small.
+#
+# PR hygiene for this repo's ruleset:
+#   * commit-message.prefix + `include: scope` make every title a Conventional
+#     Commit (`chore(deps): ...`, `ci(deps): ...`, `build(deps): ...`), which
+#     the required `conventional-title` check enforces.
+#   * The required `linked-issue` check exempts `dependabot[bot]` -- see
+#     .github/workflows/check-pr-linked-issue.yml.
+#   * Minor + patch bumps are grouped into one PR per ecosystem per run;
+#     majors come as their own PRs so they can be reviewed in isolation.
+#
+# Reference:
+#   https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # --- GitHub Actions -----------------------------------------------------
+  # Covers .github/workflows/*.yml and the local composite action. Keeps the
+  # SHA pins current -- Dependabot bumps both the `uses:` SHA and its trailing
+  # `# vX` comment, so the Scorecard "Pinned-Dependencies" posture is preserved.
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/.github/actions/setup-devshell"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # --- Backend: Express / Prisma API ----------------------------------
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      backend:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # --- Frontend: Vite / React app -----------------------------------
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      frontend:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # --- Container base images --------------------------------------
+  # backend/Dockerfile and frontend/Dockerfile (FROM node:24-slim). The
+  # docker-compose.yml images (traefik, postgres) are not tracked here -- add a
+  # `docker-compose` ecosystem entry for "/" if that coverage is wanted.
+  - package-ecosystem: docker
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      docker:
+        patterns:
+          - "*"
