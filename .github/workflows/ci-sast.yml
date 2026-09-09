@@ -1,0 +1,93 @@
+name: ci-sast
+
+# Static Application Security Testing -- external code-analysis services.
+#
+# One job per tool. A tool failing fails only its own job; `ci-sast-required`
+# is the single stable check to wire into the branch ruleset (add a job to its
+# `needs` list to make that job mandatory).
+#
+# Per-tool config lives under ./.sast/ , one file per tool:
+#   .sast/sonar-project.properties  -- SonarQube Cloud scan settings
+#
+# Secrets (repo Settings > Secrets and variables > Actions):
+#   SONARQUBE_TOKEN  -- SonarQube Cloud analysis token, passed to the scanner
+#                   as SONAR_TOKEN. Not exposed to pull requests from forks, so
+#                   the SonarQube job is skipped there (skipped, not failed --
+#                   see ci-sast-required).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".gitignore"
+      - ".github/ISSUE_TEMPLATE/*"
+      - ".github/rulesets"
+  pull_request:
+  workflow_dispatch: # allow a manual re-run from the Actions tab
+
+# Least privilege. Individual jobs opt into more where they need it.
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same PR (or branch); let every push to main
+# finish. Mirrors ci.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sonarqube:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Fork PRs cannot read the SONARQUBE_TOKEN secret. Skip rather than fail
+    # there; pushes to main and same-repo branch PRs run normally.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # SonarQube wants full history for accurate new-code + blame data.
+          fetch-depth: 0
+          # No git writes in this job; do not leave the token in .git/config.
+          persist-credentials: false
+
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          # The scanner reads SONAR_TOKEN; our secret is named SONARQUBE_TOKEN.
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+        with:
+          # Keep tool config out of the repo root.
+          args: -Dproject.settings=.sast/sonar-project.properties
+
+      # Results live in the SonarQube Cloud UI; the scan writes nothing back to
+      # the tree. The one human-readable local output worth keeping is
+      # report-task.txt (~6 lines: dashboardUrl + ceTaskUrl for this run). The
+      # rest of .scannerwork/ is protobuf -- not archived.
+      - name: Archive the analysis pointer
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sonarqube-report-task
+          path: .scannerwork/report-task.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Single stable check for the branch ruleset to require. Passes when every
+  # needed job succeeded or was skipped; fails on failure/cancelled. Mirrors
+  # ci.yml's ci-required.
+  ci-sast-required:
+    if: always()
+    needs: [sonarqube]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every required job passed
+        run: |
+          if printf '%s\n' '${{ join(needs.*.result, ' ') }}' | grep -Eqw 'failure|cancelled'; then
+            echo "a required job did not succeed: ${{ join(needs.*.result, ', ') }}"
+            exit 1
+          fi
