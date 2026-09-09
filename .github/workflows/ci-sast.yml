@@ -34,6 +34,13 @@ name: ci-sast
 # Per-tool config lives under ./.sast/ :
 #   .sast/sonar-project.properties  -- SonarQube Cloud scan settings
 #   .sast/bin/sonar-report.sh       -- builds .sast/report/sonarqube/
+#   .sast/codeql-config.yml         -- CodeQL paths / query suite
+#   .sast/bin/codeql-report.sh      -- builds .sast/report/codeql/ from the SARIF
+#
+# CodeQL runs fully in-workflow: it does NOT upload to GitHub code scanning
+# (analyze `upload: never`), so it needs no Advanced Security and no extra
+# permissions. Its findings are parsed from the SARIF into
+# .sast/report/codeql/ and committed like every other tool's report.
 #
 # Secrets (repo Settings > Secrets and variables > Actions):
 #   SONARQUBE_TOKEN    -- SonarQube Cloud analysis token (scanner SONAR_TOKEN).
@@ -182,13 +189,98 @@ jobs:
           echo "::error::SonarQube Quality Gate failed -- see the job summary"
           exit 1
 
+  codeql:
+    name: CodeQL
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # contents: read is enough -- analyze runs with `upload: never`, so nothing
+    # is sent to GitHub code scanning and security-events: write is not needed.
+    # The finding record is committed under .sast/report/codeql/ by
+    # commit-reports, exactly like the SonarQube job's.
+    permissions:
+      contents: read
+    # Always runs. When guard set run=false (a report-refresh follow-up, a
+    # draft PR, or a fork PR) every real step is skipped and the job reports
+    # success with the reason written to the job summary instead of scanning.
+    steps:
+      - name: Not scanning this run -- explain in the job summary
+        if: needs.guard.outputs.run != 'true'
+        env:
+          REASON: ${{ needs.guard.outputs.reason }}
+        run: |
+          {
+            echo "### CodeQL — not run"
+            echo
+            echo "${REASON:-Guard set run=false for this run.}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: needs.guard.outputs.run == 'true'
+        with:
+          # Check out the real branch (not the detached PR merge ref) so the
+          # analysis reflects the branch head, matching the SonarQube job.
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+          # This job does not push; commit-reports does.
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        if: needs.guard.outputs.run == 'true'
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          # Express API + Vite/React app -- one interpreted language, no build.
+          languages: javascript-typescript
+          build-mode: none
+          config-file: .sast/codeql-config.yml
+
+      - name: Analyze
+        id: analyze
+        if: needs.guard.outputs.run == 'true'
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: "/language:javascript-typescript"
+          # SARIF lands here for codeql-report.sh to parse; nothing is uploaded.
+          output: .sast/codeql-results
+          # Keep the workflow self-contained -- no dependency on GitHub code
+          # scanning / Advanced Security. Set to "always" (and add
+          # security-events: write to this job's permissions) to also publish
+          # findings to the repo's Security tab.
+          upload: never
+
+      - name: Build the branch-local report
+        id: report
+        if: needs.guard.outputs.run == 'true'
+        env:
+          SARIF_DIR: .sast/codeql-results
+          CODEQL_SCOPE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('pullRequest={0}', github.event.pull_request.number)
+                || format('branch={0}', github.ref_name) }}
+        run: bash .sast/bin/codeql-report.sh
+
+      - name: Stash the report for commit-reports
+        if: always() && needs.guard.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sast-report-codeql
+          path: .sast/report/codeql
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Enforce the gate
+        if: needs.guard.outputs.run == 'true' && steps.report.outputs.gate == 'failed'
+        run: |
+          echo "::error::CodeQL found error-severity alerts -- see the job summary"
+          exit 1
+
   # One commit for every tool's report, just before ci-sast-required. Runs
   # even if a tool job failed, so a red report is still published. When guard
   # set run=false (report refresh, draft PR, or fork PR) every step is skipped
   # and the job reports success without committing again.
   commit-reports:
     name: Commit SAST reports
-    needs: [guard, sonarqube]
+    needs: [guard, sonarqube, codeql]
     if: always() && github.ref_name != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -256,7 +348,7 @@ jobs:
   # failure/cancelled. Mirrors ci.yml's ci-required.
   ci-sast-required:
     if: always()
-    needs: [guard, sonarqube, commit-reports]
+    needs: [guard, sonarqube, codeql, commit-reports]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
