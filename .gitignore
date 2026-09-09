@@ -25,3 +25,7 @@ result-*
 
 # --- database dump ----------------------------------------------
 db_backup_*.sql
+
+# --- SAST ------------------------------------------------------
+# Scanner scratch. The kept record is .sast/report/ (tracked, refreshed by CI).
+/.scannerwork/

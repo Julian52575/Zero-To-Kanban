@@ -1,12 +1,39 @@
-# `.sast/` — Static Application Security Testing config
+# `.sast/` — Static Application Security Testing
 
-Per-tool configuration for the jobs in
-[`.github/workflows/ci-sast.yml`](../.github/workflows/ci-sast.yml). One file
-per tool.
+Config, helper scripts and branch-local reports for the jobs in
+[`.github/workflows/ci-sast.yml`](../.github/workflows/ci-sast.yml).
 
-| File | Tool | Runs as |
-| --- | --- | --- |
-| `sonar-project.properties` | SonarQube Cloud | `sonarqube` job |
+```
+.sast/
+├── sonar-project.properties   SonarQube Cloud scan settings
+├── bin/
+│   └── sonar-report.sh        builds report/sonarqube/ from a finished analysis
+└── report/
+    └── sonarqube/             refreshed by CI, committed to the branch
+        ├── summary.md         human-readable digest (also the job summary)
+        ├── badge.svg          gate badge, shown in the root README
+        ├── measures.json      raw metric values
+        └── quality-gate.json  raw gate status + failing conditions
+```
+
+## How the report stays current
+
+Each tool's job in `ci-sast.yml` runs its scan, builds `report/<tool>/`, and
+writes the same digest to the **workflow job summary**. A single
+`commit-reports` job then collects every tool's report and commits them back to
+the pull-request branch in **one commit**, just before `ci-sast-required`. So
+the files — and the README badge, which references `badge.svg` by a **relative
+path** — always reflect the branch you are viewing. The record reaches `main`
+only when the PR merges; CI never pushes to `main`.
+
+That commit is made with the default `GITHUB_TOKEN` and its message carries
+`[skip ci]`, so it starts **no** further workflow run (GITHUB_TOKEN pushes
+never trigger `push` / `pull_request` workflows; `.sast/report/**` is also in
+the relevant `paths-ignore` lists).
+
+**Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
+and pull requests from forks (no `SONARQUBE_TOKEN`). In both cases the tool
+jobs and `commit-reports` are skipped, and `ci-sast-required` stays green.
 
 ## SonarQube Cloud
 
@@ -21,14 +48,9 @@ One-time setup:
    `SONARQUBE_TOKEN` Actions secret.
 4. Put the org key and project key into `sonar-project.properties` (the
    `REPLACE_WITH_*` placeholders).
+5. Let one run land on `main` first — SonarQube Cloud needs a base-branch
+   analysis before it can decorate pull requests.
 
-The scan reports to SonarCloud and fails the job if the project's **Quality
-Gate** does not pass.
-
-### Output
-
-The analysis lives in the SonarQube Cloud UI — the scan commits nothing back
-to the repo. Each run uploads `report-task.txt` as the `sonarqube-report-task`
-workflow artifact (retained 30 days): ~6 lines of plain text with the
-`dashboardUrl` and `ceTaskUrl` for that run. The rest of the scanner's
-`.scannerwork/` scratch is protobuf and is not archived.
+The full analysis (issues, hotspots, history) stays in the SonarQube Cloud UI;
+`report/sonarqube/` is just the at-a-glance record. The job fails if the
+project's **Quality Gate** does not pass.

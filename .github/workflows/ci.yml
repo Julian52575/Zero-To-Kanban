@@ -8,6 +8,7 @@ on:
       - ".gitignore"
       - ".github/ISSUE_TEMPLATE/*"
       - ".github/rulesets"
+      - ".sast/report/**" # SAST report commits from ci-sast.yml
   pull_request:
   workflow_dispatch: # allow a manual re-run from the Actions tab
 
