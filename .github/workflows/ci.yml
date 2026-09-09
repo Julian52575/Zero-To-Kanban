@@ -116,7 +116,7 @@ jobs:
         run: |
           npm start &
           trap 'kill $!' EXIT
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:3000/items > /dev/null && exit 0
             sleep 1
           done
@@ -154,7 +154,7 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 &
           trap 'kill $!' EXIT
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:4173/ > /dev/null && exit 0
             sleep 1
           done
@@ -186,11 +186,92 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # Runs alongside backend/frontend/database. Audits THIS branch's lockfiles
+  # against the GitHub Advisory Database with `npm audit` -- the same advisory
+  # data Dependabot uses, resolved from the pull-request branch's own
+  # package-lock.json rather than from `main` (all the Dependabot alerts API can
+  # report on). Software-composition analysis, not SAST, so it lives here and
+  # not in ci-sast.yml. Informational: it surfaces the counts in the job summary
+  # and uploads the raw reports, but a known-vulnerable transitive dependency
+  # does not fail the build.
+  dependencies-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The PR branch head, not the merge ref -- the audit is purely this
+          # branch's dependency tree.
+          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Audit each workspace lockfile
+        run: |
+          set -euo pipefail
+          mkdir -p dependency-audit
+
+          {
+            echo "### Dependency audit (\`npm audit\`)"
+            echo
+            echo "_This branch's \`package-lock.json\` files vs the GitHub Advisory Database. \`main\`'s posture lives in **Security → Dependabot**._"
+            echo
+            echo '| Workspace | Critical | High | Moderate | Low | Total |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            for ws in backend frontend; do
+              raw="dependency-audit/${ws}.json"
+              # npm audit exits non-zero when it finds anything -- not an error here.
+              ( cd "$ws" && npm audit --json ) > "$raw" 2>/dev/null || true
+              if ! jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
+                echo "| \`$ws\` | ? | ? | ? | ? | npm audit failed |"
+                echo "::warning::npm audit produced no usable report for $ws" >&2
+                continue
+              fi
+              jq -r --arg ws "$ws" '.metadata.vulnerabilities
+                | "| `\($ws)` | \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"' "$raw"
+            done
+
+            echo
+            echo '<details><summary>Advisories</summary>'
+            echo
+            echo '| Workspace | Severity | Package | Direct | Fix | Advisory |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            for ws in backend frontend; do
+              raw="dependency-audit/${ws}.json"
+              [ -f "$raw" ] || continue
+              jq -r --arg ws "$ws" '
+                (.vulnerabilities // {}) | to_entries[] | .value | . as $v
+                | ([$v.via[]? | select(type == "object")]) as $adv
+                | ([$v.via[]? | select(type == "string")]) as $chain
+                | "| \($ws) | \($v.severity) | `\($v.name)` "
+                  + "| \(if $v.isDirect then "yes" else "no" end) "
+                  + "| \(if ($v.fixAvailable | type) == "object" then $v.fixAvailable.version
+                          elif $v.fixAvailable then "yes" else "no" end) "
+                  + "| \(if ($adv | length) > 0
+                          then [$adv[] | "[\(.title)](\(.url))"] | join("<br>")
+                          else "via " + ($chain | join(", ")) end) |"
+              ' "$raw"
+            done
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the raw audit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-audit
+          path: dependency-audit
+          if-no-files-found: warn
+
   # Single stable check for the branch ruleset to require.
   # Add a job to `needs` here to make it mandatory to the branch ruleset.
   ci-required:
     if: always()
-    needs: [devshell, backend, frontend, database]
+    needs: [devshell, backend, frontend, database, dependencies-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
