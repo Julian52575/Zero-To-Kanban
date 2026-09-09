@@ -156,7 +156,7 @@ jobs:
             echo "SAST reports unchanged."
             exit 0
           fi
-          git commit -m "ci(sast): refresh SAST reports for ${BRANCH} [skip ci]"
+          git commit -m "ci(sast): refresh SAST reports for ${BRANCH}"
           for attempt in 1 2 3; do
             git push origin "HEAD:${BRANCH}" && exit 0
             echo "push rejected (attempt ${attempt}); rebasing onto ${BRANCH}"
