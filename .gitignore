@@ -13,6 +13,9 @@ node_modules/
 dist/
 backend/generated/
 
+# --- test coverage --------------------------------------------------
+coverage/
+
 # --- direnv -------------------------------------------------------
 .direnv/
 

@@ -8,6 +8,7 @@
     "dev": "nodemon -L src/index.js",
     "start": "node src/index.js",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -24,6 +25,22 @@
   "jest": {
     "testMatch": [
       "<rootDir>/spec/**/*.spec.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/index.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "lcov",
+      [
+        "text",
+        {
+          "file": "coverage.txt"
+        }
+      ]
     ]
   }
 }
