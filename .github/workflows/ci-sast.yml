@@ -10,7 +10,9 @@ name: ci-sast
 #                    the PR is a draft, or the PR is from a fork (no
 #                    SONARQUBE_TOKEN). A no-op, not a skip, so PAT-pushed report
 #                    commits do not loop yet the required checks stay green on
-#                    the new SHA.
+#                    the new SHA. On a report-refresh no-op the reason links to
+#                    the previous ci-sast run (HEAD^), which holds the real
+#                    scan summaries.
 #   <tool> jobs      run the scan, build .sast/report/<tool>/ (summary.md +
 #                    badge.svg + raw JSON), write the workflow job summary,
 #                    enforce that tool's gate, and stash the report as a
@@ -87,6 +89,11 @@ jobs:
     name: Guard against self-triggered runs
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    # actions: read lets the check step look up the previous ci-sast run (the
+    # one that actually scanned) so a report-refresh no-op can link to it.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       run: ${{ steps.check.outputs.run }}
       reason: ${{ steps.check.outputs.reason }}
@@ -94,17 +101,32 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 1
+          # Depth 2 so the check step can read HEAD^ -- the commit the previous
+          # ci-sast run scanned before commit-reports pushed this refresh.
+          fetch-depth: 2
           persist-credentials: false
       - id: check
         env:
           EVENT: ${{ github.event_name }}
           IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           subject=$(git log -1 --pretty=%s)
           if [[ $EVENT == pull_request && $subject == "ci(sast): refresh SAST reports"* ]]; then
             reason="Head commit is a SAST report refresh; the previous run already scanned this tree."
+            # HEAD^ is the pre-refresh commit; surface the ci-sast run that
+            # scanned it so its summaries are one click away.
+            prev_sha=$(git rev-parse --verify --quiet HEAD^ || true)
+            if [[ -n $prev_sha ]]; then
+              prev_url=$(gh api \
+                "/repos/${GH_REPO}/actions/workflows/ci-sast.yml/runs?head_sha=${prev_sha}&per_page=1" \
+                --jq '.workflow_runs[0].html_url // empty' 2>/dev/null || true)
+            fi
+            if [[ -n ${prev_url:-} ]]; then
+              reason="${reason} Previous run with scan results: ${prev_url}"
+            fi
             echo "run=false" >> "$GITHUB_OUTPUT"
           elif [[ $IS_FORK == true ]]; then
             reason="Fork pull request -- SONARQUBE_TOKEN is not exposed to forks, so SonarQube cannot run."
