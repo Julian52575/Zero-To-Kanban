@@ -4,7 +4,7 @@
 
 | Metric | Value |
 | --- | --- |
-| Reliability | C · 1 bug(s) |
+| Reliability | A · 0 bug(s) |
 | Security | A · 0 vulnerability(ies) |
 | Security hotspots | 0 |
 | Maintainability | A · 0 smell(s) |
@@ -16,7 +16,6 @@
 
 | Metric | Comparator | Threshold | Actual |
 | --- | --- | --- | --- |
-| new_reliability_rating | GT | 1 | 3 |
 | new_coverage | LT | 80 | 0.0 |
 
-_Analysis `e29760a3-8dbc-4ff5-9d8a-302e80e539fc` · refreshed 2026-09-09T14:49:10Z._
+_Analysis `9d897946-5232-471d-b0ae-a0d0e339b7cc` · refreshed 2026-09-10T11:27:21Z._
