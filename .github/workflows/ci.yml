@@ -8,6 +8,7 @@ on:
       - ".gitignore"
       - ".github/ISSUE_TEMPLATE/*"
       - ".github/rulesets"
+      - ".sast/report/**" # ci-sast's own report commits (also carry [skip ci])
   pull_request:
   workflow_dispatch: # allow a manual re-run from the Actions tab
 

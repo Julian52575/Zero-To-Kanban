@@ -11,13 +11,13 @@ Config, helper scripts and branch-local reports for the jobs in
 │   ├── sonar-report.sh        builds report/sonarqube/ from a finished analysis
 │   └── codeql-report.sh       builds report/codeql/ from the analyze SARIF
 └── report/
-    ├── sonarqube/             refreshed by CI, committed to the branch
-    │   ├── summary.md         human-readable digest (also the job summary)
+    ├── sonarqube/             refreshed by CI on push to main
+    │   ├── summary.md         human-readable digest (also written to the run summary, pass or fail)
     │   ├── badge.svg          gate badge, shown in the root README
     │   ├── measures.json      raw metric values
     │   └── quality-gate.json  raw gate status + failing conditions
-    └── codeql/                refreshed by CI, committed to the branch
-        ├── summary.md         human-readable digest (also the job summary)
+    └── codeql/                refreshed by CI on push to main
+        ├── summary.md         human-readable digest (also written to the run summary, pass or fail)
         ├── badge.svg          verdict badge, shown in the root README
         ├── findings.json      normalised findings + counts by severity
         └── results.sarif      raw CodeQL SARIF (all languages merged)
@@ -25,29 +25,28 @@ Config, helper scripts and branch-local reports for the jobs in
 
 ## How the report stays current
 
-Each tool's job in `ci-sast.yml` runs its scan, builds `report/<tool>/`, and
-writes the same digest to the **workflow job summary**. A single
-`commit-reports` job then collects every tool's report and commits them back to
-the pull-request branch in **one commit**, just before `ci-sast-required`. So
-the files — and the README badge, which references `badge.svg` by a **relative
-path** — always reflect the branch you are viewing. The record reaches `main`
-only when the PR merges; CI never pushes to `main`.
+On every **pull request** each tool's job in `ci-sast.yml` runs its scan, builds
+`report/<tool>/`, writes that digest to the **run summary** (pass or fail, so
+the team can read the result without opening the report files), and enforces
+that tool's gate — but commits nothing.
 
-That commit is pushed with the **`SAST_REPORT_TOKEN`** PAT (Contents: read and
-write), so — unlike a `GITHUB_TOKEN` push — it re-triggers `ci` and `ci-sast`
-on the new commit. That is deliberate: the required checks must report on the
-head SHA or the PR softlocks. The follow-up `ci-sast` run would otherwise scan
-and commit again, so a `guard` job detects that the branch head is a
-`ci(sast): refresh SAST reports…` commit: the tool jobs then run but skip every
-real step, **reporting success without re-scanning**. The loop stops after one
-extra (near-instant) run, and every check stays green on the new SHA.
+On **push to `main`** (i.e. after a PR merges) the same scan runs, and a single
+`commit-reports` job then collects every tool's report and commits them to
+`main` in **one commit** whose message ends with `[skip ci]`. So the committed
+files — and the README badge, which references `badge.svg` by a **relative
+path** — track the latest `main`, and PR branches never carry report commits
+(hence never hit report merge conflicts).
 
-**No-scan runs:** report-refresh commits — the tool jobs and `commit-reports`
-run to green as a no-op.
+The commit is pushed with the **`SAST_REPORT_TOKEN`** PAT (Contents: read and
+write), so a protected `main` accepts it without a GitHub Actions ruleset
+bypass. A PAT push would normally re-trigger `ci` / `ci-sast`; the `[skip ci]`
+marker in the commit message plus a `.sast/report/**` `paths-ignore` on both
+workflows stop that — no self-trigger loop. `cancel-in-progress` is `false` for
+push, so the commit also cannot cancel an in-flight run.
 
 **Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
-and pull requests from forks (no `SONARQUBE_TOKEN`) — the tool jobs and
-`commit-reports` are skipped and `ci-sast-required` stays green.
+and pull requests from forks (no `SONARQUBE_TOKEN`) — the tool jobs run to green
+as a no-op, `commit-reports` is skipped, and `ci-sast-required` stays green.
 
 ## SonarQube Cloud
 
@@ -63,8 +62,9 @@ One-time setup:
 4. Put the org key and project key into `sonar-project.properties` (the
    `REPLACE_WITH_*` placeholders).
 5. Add a **`SAST_REPORT_TOKEN`** Actions secret — a PAT with *Contents: read
-   and write* on this repo — so `commit-reports` can push the refreshed report
-   in a way that re-triggers CI on the new commit.
+   and write* on this repo — so `commit-reports` can push the `[skip ci]`
+   report commit to `main`. If a ruleset protects `main`, add that PAT's
+   account to its bypass list.
 6. Let one run land on `main` first — SonarQube Cloud needs a base-branch
    analysis before it can decorate pull requests.
 
@@ -85,7 +85,7 @@ scanning being enabled and the `codeql` job needs only `contents: read`.
 - **`findings.json`** — every result normalised to
   `{ ruleId, name, level, securitySeverity, message, file, line }`, plus
   `bySeverity` counts and a `verdict`.
-- **`summary.md`** — the digest, also written to the workflow job summary.
+- **`summary.md`** — the digest, also written to the run summary (pass or fail).
 - **`badge.svg`** — `passed` (green) / `warning` (yellow) / `failed` (red),
   referenced by `README.md` via a relative path.
 - **`results.sarif`** — the raw SARIF, kept so it can be uploaded later by hand.
