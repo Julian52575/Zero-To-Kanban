@@ -37,12 +37,12 @@ files — and the README badge, which references `badge.svg` by a **relative
 path** — track the latest `main`, and PR branches never carry report commits
 (hence never hit report merge conflicts).
 
-The commit is pushed with the built-in **`GITHUB_TOKEN`** (`contents: write` on
-the `commit-reports` job). A `GITHUB_TOKEN` push starts no workflow run, and the
-`[skip ci]` marker plus a `.sast/report/**` `paths-ignore` on both `ci` and
-`ci-sast` make doubly sure of it — no self-trigger loop, and the push cannot
-cancel an in-flight run. If a ruleset protects `main`, add **GitHub Actions** to
-its bypass list (mode: *Always*) so the push is allowed.
+The commit is pushed with the **`SAST_REPORT_TOKEN`** PAT (Contents: read and
+write), so a protected `main` accepts it without a GitHub Actions ruleset
+bypass. A PAT push would normally re-trigger `ci` / `ci-sast`; the `[skip ci]`
+marker in the commit message plus a `.sast/report/**` `paths-ignore` on both
+workflows stop that — no self-trigger loop. `cancel-in-progress` is `false` for
+push, so the commit also cannot cancel an in-flight run.
 
 **Skipped runs:** draft pull requests (SAST runs once the PR is marked ready)
 and pull requests from forks (no `SONARQUBE_TOKEN`) — the tool jobs run to green
@@ -61,9 +61,10 @@ One-time setup:
    `SONARQUBE_TOKEN` Actions secret.
 4. Put the org key and project key into `sonar-project.properties` (the
    `REPLACE_WITH_*` placeholders).
-5. If a ruleset protects `main`, add **GitHub Actions** to its bypass list
-   (mode: *Always*) so `commit-reports` can push the `[skip ci]` report commit
-   with `GITHUB_TOKEN`. No PAT is needed.
+5. Add a **`SAST_REPORT_TOKEN`** Actions secret — a PAT with *Contents: read
+   and write* on this repo — so `commit-reports` can push the `[skip ci]`
+   report commit to `main`. If a ruleset protects `main`, add that PAT's
+   account to its bypass list.
 6. Let one run land on `main` first — SonarQube Cloud needs a base-branch
    analysis before it can decorate pull requests.
 

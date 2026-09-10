@@ -15,10 +15,12 @@ name: ci-sast
 #                    sast-report-<tool>.
 #   commit-reports   push to main only. Collects every sast-report-* artifact
 #                    and commits the reports to main in ONE commit whose message
-#                    ends with [skip ci], so the push starts no further run.
-#                    Pushes with GITHUB_TOKEN (contents: write). Never runs on a
-#                    pull request -- PR branches never carry report commits, so
-#                    report files never cause merge conflicts.
+#                    ends with [skip ci]. Pushes with the SAST_REPORT_TOKEN PAT
+#                    (so a protected main accepts it without a GitHub Actions
+#                    bypass); the [skip ci] marker plus the .sast/report/**
+#                    paths-ignore stop that PAT push from starting a new run.
+#                    Never runs on a pull request -- PR branches never carry
+#                    report commits, so report files never cause merge conflicts.
 #   ci-sast-required single stable check for the branch ruleset (add a job to
 #                    its `needs` list to make that job mandatory). commit-reports
 #                    is `skipped` on PRs, which counts as passing.
@@ -38,7 +40,9 @@ name: ci-sast
 # and committed on main like the SonarQube report.
 #
 # Secrets (repo Settings > Secrets and variables > Actions):
-#   SONARQUBE_TOKEN  -- SonarQube Cloud analysis token (scanner SONAR_TOKEN).
+#   SONARQUBE_TOKEN    -- SonarQube Cloud analysis token (scanner SONAR_TOKEN).
+#   SAST_REPORT_TOKEN  -- PAT with Contents: read and write. commit-reports
+#                         pushes the [skip ci] report commit to main with it.
 
 on:
   push:
@@ -53,15 +57,15 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch: # allow a manual re-run from the Actions tab
 
-# Least privilege. Only commit-reports writes, and it raises contents: write on
-# the job itself.
+# Least privilege. commit-reports pushes with the SAST_REPORT_TOKEN PAT, not
+# GITHUB_TOKEN, so no job needs contents: write.
 permissions:
   contents: read
 
 # Cancel superseded PR runs. Never cancel a push-to-main run: it may be
 # mid-scan when the next merge lands, and killing it would drop that commit's
-# SAST report. commit-reports' own push carries [skip ci], so it starts no run
-# that could cancel anything.
+# SAST report. commit-reports' own PAT push carries [skip ci], so it starts no
+# run that could cancel anything.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -251,16 +255,16 @@ jobs:
     if: always() && github.ref == 'refs/heads/main' && needs.guard.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
           fetch-depth: 0
-          # Leave GITHUB_TOKEN in .git/config for the push (contents: write
-          # above). A GITHUB_TOKEN push does not start a workflow run, and the
-          # commit message also carries [skip ci] -- so no loop either way.
+          # SAST_REPORT_TOKEN (a PAT with Contents: write) is left in
+          # .git/config for the push, so a protected main accepts it without a
+          # GitHub Actions bypass. A PAT push would normally re-trigger CI; the
+          # [skip ci] marker and the .sast/report/** paths-ignore prevent that.
+          token: ${{ secrets.SAST_REPORT_TOKEN }}
 
       - name: Collect tool reports
         continue-on-error: true # nothing to collect if every tool job crashed early
