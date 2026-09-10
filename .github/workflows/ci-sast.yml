@@ -153,6 +153,29 @@ jobs:
           # This job does not push; commit-reports does.
           persist-credentials: false
 
+      # SonarQube itself does not run the tests -- it only imports the lcov
+      # report the scanner is pointed at (sonar.javascript.lcov.reportPaths in
+      # .sast/sonar-project.properties). Without this step no report exists and
+      # the scanner's Zero Coverage Sensor reports 0%, failing the new-code
+      # coverage condition. Mirrors ci.yml's `backend` job.
+      - name: Set up Node
+        if: needs.guard.outputs.run == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        if: needs.guard.outputs.run == 'true'
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate backend coverage for SonarQube
+        if: needs.guard.outputs.run == 'true'
+        working-directory: backend
+        run: npm run test:coverage
+
       - name: SonarQube scan
         if: needs.guard.outputs.run == 'true'
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
