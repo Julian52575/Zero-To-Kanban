@@ -2,10 +2,10 @@
 # Turn the analysis that SonarSource/sonarqube-scan-action just uploaded into a
 # small, branch-local record under .sast/report/sonarqube/ .
 #
-# Produces (ci-sast.yml's commit-reports job commits these back to the branch):
+# Produces (ci-sast.yml's commit-reports job commits these to main on push):
 #   measures.json      raw metric values from the SonarQube Cloud API
 #   quality-gate.json  raw Quality Gate status + any failing conditions
-#   summary.md         human-readable digest -- also the workflow job summary
+#   summary.md         human-readable digest -- also written to the run summary
 #   badge.svg          gate badge, referenced by README.md via a relative path
 #
 # Inputs (env):
@@ -96,7 +96,7 @@ SVG
 }
 badge "SonarQube" "$verdict" "$colour" "$report_dir/badge.svg"
 
-# --- summary.md: committed, and used as the job summary -------------
+# --- summary.md: committed, and written to the run summary -------------
 {
   echo "## SonarQube Cloud — $heading"
   echo
@@ -127,8 +127,10 @@ badge "SonarQube" "$verdict" "$colour" "$report_dir/badge.svg"
   echo "_Analysis \`$analysis_id\` · refreshed $(date -u +%Y-%m-%dT%H:%M:%SZ)._"
 } > "$report_dir/summary.md"
 
+# Written to the run summary on every run, pass or fail, so the team reads the
+# result straight from the run without opening .sast/report/sonarqube/summary.md.
 [[ -n ${GITHUB_STEP_SUMMARY:-} ]] && cat "$report_dir/summary.md" >> "$GITHUB_STEP_SUMMARY"
-[[ -n ${GITHUB_OUTPUT:-}       ]] && echo "gate=$verdict" >> "$GITHUB_OUTPUT"
+[[ -n ${GITHUB_OUTPUT:-} ]] && echo "gate=$verdict" >> "$GITHUB_OUTPUT"
 [[ $verdict == unknown ]] && echo "::warning::could not determine the SonarQube Quality Gate status"
 
 echo "sonar-report: gate=$verdict analysis=$analysis_id"

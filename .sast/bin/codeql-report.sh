@@ -2,10 +2,10 @@
 # Turn the SARIF that github/codeql-action/analyze just wrote into a small,
 # branch-local record under .sast/report/codeql/ .
 #
-# Produces (ci-sast.yml's commit-reports job commits these back to the branch):
+# Produces (ci-sast.yml's commit-reports job commits these to main on push):
 #   results.sarif   raw CodeQL SARIF (all languages merged into one runs[])
 #   findings.json   normalised finding list + counts by severity
-#   summary.md      human-readable digest -- also the workflow job summary
+#   summary.md      human-readable digest -- also written to the run summary
 #   badge.svg       verdict badge, referenced by README.md via a relative path
 #
 # Inputs (env):
@@ -116,7 +116,7 @@ SVG
 }
 badge "CodeQL" "$verdict" "$colour" "$report_dir/badge.svg"
 
-# --- summary.md: committed, and used as the job summary ----------
+# --- summary.md: committed, and written to the run summary ----------
 label=${CODEQL_SCOPE#*=}
 if [[ ${CODEQL_SCOPE:-} == pullRequest=* ]]; then
   heading="PR #$label"
@@ -163,7 +163,9 @@ fi
   echo "_Scanned ${langs:-CodeQL} · refreshed $(date -u +%Y-%m-%dT%H:%M:%SZ)._"
 } > "$report_dir/summary.md"
 
+# Written to the run summary on every run, pass or fail, so the team reads the
+# result straight from the run without opening .sast/report/codeql/summary.md.
 [[ -n ${GITHUB_STEP_SUMMARY:-} ]] && cat "$report_dir/summary.md" >> "$GITHUB_STEP_SUMMARY"
-[[ -n ${GITHUB_OUTPUT:-}       ]] && echo "gate=$verdict" >> "$GITHUB_OUTPUT"
+[[ -n ${GITHUB_OUTPUT:-} ]] && echo "gate=$verdict" >> "$GITHUB_OUTPUT"
 
 echo "codeql-report: verdict=$verdict errors=$errors warnings=$warnings notes=$notes total=$total"
