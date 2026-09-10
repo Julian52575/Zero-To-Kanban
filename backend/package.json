@@ -2,11 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "private": true,
-  "main": "src/index.js",
+  "main": "src/server.js",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon -L src/index.js",
-    "start": "node src/index.js",
+    "dev": "nodemon -L src/server.js",
+    "start": "node src/server.js",
     "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
