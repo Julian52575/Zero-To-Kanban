@@ -2,7 +2,7 @@ body {
     background-color: #f4f4f4;
     margin: 0;
     margin-top: 50px;
-    font-family: 'Lato';
+    font-family: 'Lato', sans-serif;
 }
 
 .item {
