@@ -16,6 +16,9 @@ backend/generated/
 # --- test coverage --------------------------------------------------
 coverage/
 
+# --- ci: npm audit output (uploaded as an artifact, never committed) -----
+/dependency-audit/
+
 # --- direnv -------------------------------------------------------
 .direnv/
 

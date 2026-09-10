@@ -4,7 +4,7 @@
 
 | Metric | Value |
 | --- | --- |
-| Reliability | C · 1 bug(s) |
+| Reliability | A · 0 bug(s) |
 | Security | A · 0 vulnerability(ies) |
 | Security hotspots | 0 |
 | Maintainability | A · 0 smell(s) |
