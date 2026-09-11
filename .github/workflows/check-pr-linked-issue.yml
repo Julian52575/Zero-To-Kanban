@@ -15,7 +15,7 @@ on:
   pull_request:
     # No `synchronize`: the linked issue lives in the PR body, which pushes do
     # not touch. `edited` covers body/title changes.
-    types: [opened, edited, reopened, ready_for_review]
+    types: [opened, edited, reopened, ready_for_review, synchronize]
 
 # Least privilege: read-only, and only the scopes the GraphQL query reads.
 permissions:
