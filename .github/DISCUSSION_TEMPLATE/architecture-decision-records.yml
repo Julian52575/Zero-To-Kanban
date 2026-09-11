@@ -1,5 +1,11 @@
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        💡 **If this is a Superseded document, you can use the previous ADR name as Title. ADRs will have a github #number.**
+
   - type: input
     id: date
     attributes:
@@ -42,6 +48,15 @@ body:
       default: 0
     validations:
       required: true
+
+  - type: input
+    id: branch
+    attributes:
+      label: Branch
+      description: Branch to commit the ADR document to once this decision is Accepted and the discussion is closed. Leave empty until ready -- the discussion will be reopened and you'll be asked to fill it in if it's missing.
+      placeholder: main
+    validations:
+      required: false
 
   - type: textarea
     id: justification
@@ -88,4 +103,5 @@ body:
     attributes:
       value: |
         ---
-        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.**
+        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.
+        Make sure to include a branch to commit the document.**

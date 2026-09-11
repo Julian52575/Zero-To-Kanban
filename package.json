@@ -1,6 +1,39 @@
 {
   "name": "zero-to-kanban",
   "version": "1.0.1",
+  "main": "index.js",
   "private": true,
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "dev": "nodemon -L src/index.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "react": "^19.2.8",
+    "react-bootstrap": "^1.6.8",
+    "react-dom": "^19.2.8",
+    "bootstrap": "^5.3.8",
+    "mysql2": "^3.23.1",
+    "sqlite3": "^5.1.7",
+    "uuid": "^13.0.0",
+    "wait-port": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "nodemon": "^3.1.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  },
+  "overrides": {
+    "tar": "7.5.4",
+    "glob": "11.1.0",
+    "semver": "7.5.2",
+    "cross-spawn": "7.0.5",
+    "braces": "3.0.3",
+    "http-cache-semantics": "4.1.1",
+    "socks": "2.8.1"
+  }
 }
