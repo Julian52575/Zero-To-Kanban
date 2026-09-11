@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-09-11T22:03:01Z",
+  "tool": "CodeQL",
+  "verdict": "passed",
+  "total": 0,
+  "bySeverity": {
+    "error": 0,
+    "warning": 0,
+    "note": 0
+  },
+  "findings": []
+}
