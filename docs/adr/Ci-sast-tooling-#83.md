@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-09 07:51Z
-- **Closed:** 2026-09-11 13:51Z
+- **Closed:** 2026-09-11 13:53Z
 
 ### Discussion
 
@@ -77,6 +77,10 @@ _No response_
 This will be included into the #60 PR so team can use it directly
 
 #### @Julian52575 -- 2026-09-11 13:51Z
+
+/commit 59-split-frontend-and-backend
+
+#### @Julian52575 -- 2026-09-11 13:53Z
 
 /commit 59-split-frontend-and-backend
 
