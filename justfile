@@ -1,16 +1,17 @@
 set dotenv-load := true
 set shell := ["bash", "-eu", "-c"]
 
+tool := `command -v podman >/dev/null && echo podman || echo docker`
+compose := tool + " compose"
+
 # List available recipes
 default:
     @just --list
-    @echo "\nusing: {{tool}}"
+    @echo -e "\nusing '{{tool}}' as a container tool."
 
 #### Container
 
 # podman if present, else docker -- every recipe goes through this
-tool := `command -v podman >/dev/null && echo podman || echo docker`
-compose := tool + " compose"
 
 # Start the stack. Pass `-d` to detach (recommended -- see README).
 up *args:
@@ -34,8 +35,17 @@ rm *args:
 nuke *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    read -rp "Delete containers, images AND volumes for this project? type 'yes': " c
+    read -rp "⚠️  Delete containers, images AND volumes for this project? type 'yes': " c
     [[ "$c" == "yes" ]] || { echo "aborted"; exit 1; }
+    if ! just database-dump; then
+        echo "⚠️⚠️  database-dump FAILED -- the database volume is about to be deleted with no fresh backup!"
+        read -p "Type 'yes' to nuke anyway: " confirm
+        echo "$confirm"
+        if [ "$confirm" != "yes" ]; then
+            echo "Aborted."
+            exit 1
+        fi
+    fi
     {{compose}} down --volumes --remove-orphans {{args}}
     just rm
     echo "done"
@@ -78,3 +88,58 @@ attach service:
 # (internal) print the container id for a compose service in this project
 _cid service:
     @{{tool}} ps -q --filter "label=com.docker.compose.project.working_dir={{justfile_directory()}}" --filter "label=com.docker.compose.service={{service}}" | head -n1
+
+DATABASE_DUMP_FILE := "db_backup_$(date +%Y%m%d_%H%M%S).sql"
+# dump the whole database into a .sql file (starts the db container if it is down, stops it again after)
+database-dump:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    service="db"
+    proj="com.docker.compose.project.working_dir={{justfile_directory()}}"
+    svc="com.docker.compose.service=$service"
+    pg="$({{tool}} ps -aq --filter "label=$proj" --filter "label=$svc" | head -n1)"
+    started=0
+    cleanup() { if [[ "$started" == 1 ]]; then echo "stopping $service (it was down before the dump)"; {{tool}} stop "$pg" >/dev/null || true; fi; }
+    trap cleanup EXIT
+    if [[ -z "$pg" || -z "$({{tool}} ps -q --filter "label=$proj" --filter "label=$svc")" ]]; then
+        echo "$service is down -- starting it for the dump"
+        started=1
+        DOCKER_SOCKET=${DOCKER_SOCKET:-/var/run/docker.sock} {{tool}} compose up -d $service
+        for _ in $(seq 1 30); do
+            pg="$({{tool}} ps -aq --filter "label=$proj" --filter "label=$svc" | head -n1)"
+            if [[ -n "$pg" ]] && {{tool}} exec "$pg" pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1; then break; fi
+            sleep 1
+        done
+    fi
+    [[ -n "$pg" ]] || { echo "could not find the $service container" >&2; exit 1; }
+    {{tool}} exec "$pg" pg_dumpall -U "${POSTGRES_USER}" > {{DATABASE_DUMP_FILE}}
+    echo "Dumped database into {{DATABASE_DUMP_FILE}}"
+
+# cat `$DATABASE_FILE` into the database (starts the db container if it is down, stops it again after)
+database-pipe DATABASE_FILE:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f "{{DATABASE_FILE}}" ]]; then
+        echo "Error: {{DATABASE_FILE}} not found"
+        exit 1
+    fi
+    service="db"
+    proj="com.docker.compose.project.working_dir={{justfile_directory()}}"
+    svc="com.docker.compose.service=$service"
+    pg="$({{tool}} ps -aq --filter "label=$proj" --filter "label=$svc" | head -n1)"
+    started=0
+    cleanup() { if [[ "$started" == 1 ]]; then echo "stopping $service (it was down before the restore)"; {{tool}} stop "$pg" >/dev/null || true; fi; }
+    trap cleanup EXIT
+    if [[ -z "$pg" || -z "$({{tool}} ps -q --filter "label=$proj" --filter "label=$svc")" ]]; then
+        echo "$service is down -- starting it for the restore"
+        started=1
+        DOCKER_SOCKET=${DOCKER_SOCKET:-/var/run/docker.sock} {{tool}} compose up -d $service
+        for _ in $(seq 1 30); do
+            pg="$({{tool}} ps -aq --filter "label=$proj" --filter "label=$svc" | head -n1)"
+            if [[ -n "$pg" ]] && {{tool}} exec "$pg" pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1; then break; fi
+            sleep 1
+        done
+    fi
+    [[ -n "$pg" ]] || { echo "could not find the $service container" >&2; exit 1; }
+    {{tool}} exec -i "$pg" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < {{DATABASE_FILE}}
+    echo "Piped {{DATABASE_FILE}} into the database"

@@ -8,6 +8,17 @@
 # --- local environment ----------------------------------------------
 .env
 
+# --- node / frontend build output ------------------------------------
+node_modules/
+dist/
+backend/generated/
+
+# --- test coverage --------------------------------------------------
+coverage/
+
+# --- ci: npm audit output (uploaded as an artifact, never committed) -----
+/dependency-audit/
+
 # --- direnv -------------------------------------------------------
 .direnv/
 
@@ -17,3 +28,12 @@ result-*
 
 .claude
 .vscode
+node_modules/
+# --- database dump ----------------------------------------------
+db_backup_*.sql
+
+# --- SAST ------------------------------------------------------
+# Scanner scratch. The kept record is .sast/report/ (tracked, refreshed by CI).
+/.scannerwork/
+/.sast/codeql-db/
+/.sast/codeql-results/
