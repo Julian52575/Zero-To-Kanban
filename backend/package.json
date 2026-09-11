@@ -27,8 +27,7 @@
       "<rootDir>/spec/**/*.spec.js"
     ],
     "collectCoverageFrom": [
-      "src/**/*.js",
-      "!src/index.js"
+      "src/**/*.js"
     ],
     "coverageDirectory": "coverage",
     "coverageReporters": [
