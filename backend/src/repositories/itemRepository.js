@@ -24,4 +24,6 @@ module.exports = {
     getAll,
     create,
     deleteById,
+    updateById,
+    getById,
 };
