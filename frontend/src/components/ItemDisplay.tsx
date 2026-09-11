@@ -1,7 +1,18 @@
 import React from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
+import type { Item } from '../types/item';
 
-function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
+interface ItemDisplayProps {
+    item: Item;
+    onItemUpdate: (item: Item) => void;
+    onItemRemoval: (item: Item) => void;
+}
+
+function ItemDisplay({
+    item,
+    onItemUpdate,
+    onItemRemoval,
+}: ItemDisplayProps) {
     const toggleCompletion = () => {
         fetch(`/items/${item.id}`, {
             method: 'PUT',
@@ -14,7 +25,7 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
             },
         })
             .then(r => r.json())
-            .then(onItemUpdate);
+            .then((updatedItem: Item) => onItemUpdate(updatedItem));
     };
 
     const removeItem = () => {
@@ -26,7 +37,7 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
     return (
         <Container
             fluid
-            className={`item ${item.completed && 'completed'}`}
+            className={`item ${item.completed ? 'completed' : ''}`}
         >
             <Row>
                 <Col xs={1} className="text-center">
@@ -71,3 +82,4 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
 }
 
 export default ItemDisplay;
+
