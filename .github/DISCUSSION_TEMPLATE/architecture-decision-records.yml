@@ -30,6 +30,23 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: interrogations
+    attributes:
+      label: Interrogation 
+      description: What questions need to be answered ? What topic should be looked further in-depth ?
+      placeholder: |
+        - What database needs should the project prioritize ? 
+        - Look into OLTP and OLAP.
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        🧠 **The fields below requires teamwork to achieve the best decision. You should draft them first and wait for team feedbacks.**
+
   - type: dropdown
     id: decision
     attributes:
@@ -52,9 +69,18 @@ body:
       required: false
 
   - type: textarea
-    id: consequences
+    id: consequences-upside
     attributes:
-      label: Consequences
+      label: Consequences -- Upside
+      description: What are the expected benefits ?
+      placeholder: Fast database queries.
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences-tradeoff
+    attributes:
+      label: Consequences -- Trade-offs and risks
       description: What are the expected consequences, trade-offs, or risks?
       placeholder: Optimization work required; no migration.
     validations:
@@ -88,4 +114,4 @@ body:
     attributes:
       value: |
         ---
-        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.**
+        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion. Idealy, link to the merged PR's commit hash.**
