@@ -17,3 +17,4 @@ result-*
 
 .claude
 .vscode
+node_modules/
