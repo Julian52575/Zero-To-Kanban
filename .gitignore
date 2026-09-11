@@ -28,7 +28,7 @@ result-*
 
 .claude
 .vscode
-
+node_modules/
 # --- database dump ----------------------------------------------
 db_backup_*.sql
 
