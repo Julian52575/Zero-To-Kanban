@@ -118,17 +118,19 @@ jobs:
           persist-credentials: false
 
       # SonarQube itself does not run the tests -- it only imports the lcov
-      # report the scanner is pointed at (sonar.javascript.lcov.reportPaths in
-      # .sast/sonar-project.properties). Without this step no report exists and
-      # the scanner's Zero Coverage Sensor reports 0%, failing the new-code
-      # coverage condition. Mirrors ci.yml's `backend` job.
+      # reports the scanner is pointed at (sonar.javascript.lcov.reportPaths in
+      # .sast/sonar-project.properties). Without these steps no report exists
+      # and the scanner's Zero Coverage Sensor reports 0%, failing the
+      # new-code coverage condition. Mirrors ci.yml's `backend`/`frontend` jobs.
       - name: Set up Node
         if: needs.guard.outputs.run == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install backend dependencies
         if: needs.guard.outputs.run == 'true'
@@ -138,6 +140,16 @@ jobs:
       - name: Generate backend coverage for SonarQube
         if: needs.guard.outputs.run == 'true'
         working-directory: backend
+        run: npm run test:coverage
+
+      - name: Install frontend dependencies
+        if: needs.guard.outputs.run == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate frontend coverage for SonarQube
+        if: needs.guard.outputs.run == 'true'
+        working-directory: frontend
         run: npm run test:coverage
 
       - name: SonarQube scan
