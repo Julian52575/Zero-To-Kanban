@@ -2,11 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "private": true,
-  "main": "src/index.js",
+  "main": "src/server.js",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon -L src/index.js",
-    "start": "node src/index.js",
+    "dev": "nodemon -L src/server.js",
+    "start": "node src/server.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
@@ -27,8 +27,7 @@
       "<rootDir>/spec/**/*.spec.js"
     ],
     "collectCoverageFrom": [
-      "src/**/*.js",
-      "!src/index.js"
+      "src/**/*.js"
     ],
     "coverageDirectory": "coverage",
     "coverageReporters": [
