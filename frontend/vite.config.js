@@ -1,16 +1,29 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // Prefer TS/TSX over the stale, superseded .jsx/.js duplicates left in
+    // src/ and components/ -- see frontend cleanup notes.
+    extensions: ['.tsx', '.ts', '.mjs', '.js', '.jsx', '.json'],
+  },
   server: {
-    // Local `npm run dev` parity with the Traefik routing in docker-compose.yml.
     proxy: {
-      '/items': 'http://localhost:3000',
-      '/auth': 'http://localhost:4000',
-      '/login': 'http://localhost:4000',
-      '/register': 'http://localhost:4000',
+      '/items': 'http://backend:3000',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/setupTests.ts',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,tsx}'],
     },
   },
 })

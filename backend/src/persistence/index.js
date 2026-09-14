@@ -20,7 +20,7 @@ async function getItem(id) {
 }
 
 async function storeItem(item) {
-    await prisma.todoItem.create({
+    return prisma.todoItem.create({
         data: { id: item.id, name: item.name, completed: item.completed },
     });
 }

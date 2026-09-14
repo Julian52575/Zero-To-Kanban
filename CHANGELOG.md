@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0](https://github.com/Julian52575/Zero-To-Kanban/compare/1.0.1...2.0.0) (2026-09-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* split front, back and db into separate services and ci tests ([#60](https://github.com/Julian52575/Zero-To-Kanban/issues/60))
+
+### Documentation
+
+* **adr template:** options field ([2f38883](https://github.com/Julian52575/Zero-To-Kanban/commit/2f3888311fbf48c7669f52ad9343f321a5661682))
+* **adr template:** restored teamwork disclaimer and split consequences ([91a77c8](https://github.com/Julian52575/Zero-To-Kanban/commit/91a77c8f6e4e3aa3f3d676d4d66a556efbf56c18))
+* **code of conduct:** contributor covenant template ([d11c45c](https://github.com/Julian52575/Zero-To-Kanban/commit/d11c45c4c57542fdfc038396ebe298d65f28ec15))
+* **contributing:** contributing.md ([b5b682b](https://github.com/Julian52575/Zero-To-Kanban/commit/b5b682bf9c5930b942ebc22492ad081c0cc3ccc5))
+* **readme:** project documentation section ([e8ea42a](https://github.com/Julian52575/Zero-To-Kanban/commit/e8ea42aee6a21f895da7eb53e441b20d53c2e89b))
+
+
+### Code Refactoring
+
+* split front, back and db into separate services and ci tests ([#60](https://github.com/Julian52575/Zero-To-Kanban/issues/60)) ([59700a2](https://github.com/Julian52575/Zero-To-Kanban/commit/59700a2a65422553549900c6d02ef4cfc84f8ca5))
+
 ## [1.0.1](https://github.com/Julian52575/Zero-To-Kanban/compare/1.0.0...1.0.1) (2026-09-03)
 
 

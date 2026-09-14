@@ -72,5 +72,5 @@ jobs:
         #env:
         #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Published ${{ steps.release.outputs.tag_name }}"
+          echo "Published ${{ steps.release-please.outputs.tag_name }}"
         # gh release upload ${{ steps.release-please.outputs.tag_name }} ./artifact/some-build-artifact.zip
