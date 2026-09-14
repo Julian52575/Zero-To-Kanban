@@ -19,7 +19,7 @@ services:
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --api.dashboard=true
-      - --api.insecure=true        # dashboard on :8080 with no auth -- dev only
+      - --api.insecure=true # dashboard on :8080 with no auth -- dev only
       - --accesslog=true
     ports:
       - "${PROXY_PORT:-8000}:80"
@@ -49,6 +49,8 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}?schema=public
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
@@ -59,7 +61,11 @@ services:
       - traefik.http.services.backend.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/items', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://127.0.0.1:3000/items'', r => process.exit(r.statusCode === 200 ? 0 : 1)).on(''error'', () => process.exit(1))"',
+        ]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -71,9 +77,17 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.frontend.rule=PathPrefix(`/`)
-      - traefik.http.routers.frontend.priority=1        # catch-all: lowest priority
+      - traefik.http.routers.frontend.priority=1 # catch-all: lowest priority
       - traefik.http.services.frontend.loadbalancer.server.port=5173
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 volumes:
   todo-db-data:
