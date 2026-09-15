@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon -L src/server.js",
     "start": "node src/server.js",
-    "test": "jest",
+    "test": "node --env-file=../.env ./node_modules/jest/bin/jest",
     "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
@@ -16,7 +16,8 @@
     "@prisma/client": "^6.5.0",
     "amqplib": "^2.0.1",
     "express": "^5.2.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "jest": "^29.7.0",

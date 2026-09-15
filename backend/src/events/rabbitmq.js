@@ -1,19 +1,24 @@
 const amqp = require("amqplib");
 
-const { RABBITMQ_USER, RABBITMQ_PASSWORD } = process.env;
+const {
+  RABBITMQ_USER,
+  RABBITMQ_PASSWORD,
+  RABBITMQ_HOST = "localhost",
+  RABBITMQ_PORT = 5672,
+} = process.env;
 
 let connection;
 let channel;
 let shuttingDown = false;
 let reconnecting = false;
 
-async function connectRabbitMQ(port = 5672) {
+async function connectRabbitMQ() {
   connection = await amqp.connect(
-    `amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${port}`,
+    `amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:${RABBITMQ_PORT}`,
   );
-  
-  channel = await connection.createChannel();
-  
+
+  channel = await connection.createConfirmChannel();
+
   await channel.assertExchange("events", "topic", { durable: true });
 
   console.log("Connected to RabbitMQ");

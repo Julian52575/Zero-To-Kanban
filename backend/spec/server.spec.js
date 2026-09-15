@@ -13,6 +13,14 @@ describe('server', () => {
             init: jest.fn(),
             teardown: jest.fn(),
         }));
+        jest.doMock('../src/events/rabbitmq', () => ({
+            connectRabbitMQ: jest.fn(),
+            closeRabbitMQ: jest.fn(),
+        }));
+
+        jest.doMock('../src/events/eventBus', () => ({
+            startConsumeFor: jest.fn(),
+        }));
 
         exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
         jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -31,8 +39,8 @@ describe('server', () => {
         db.init.mockResolvedValue();
         app = require('../src/app');
 
-        require('../src/server');
-        await flush();
+        const { startServer } = require('../src/server');
+        await startServer();
 
         expect(app.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 
@@ -45,8 +53,8 @@ describe('server', () => {
         const error = new Error('connection failed');
         db.init.mockRejectedValue(error);
 
-        require('../src/server');
-        await flush();
+        const { startServer } = require('../src/server');
+        await startServer();
 
         expect(console.error).toHaveBeenCalledWith(error);
         expect(exitSpy).toHaveBeenCalledWith(1);
@@ -57,8 +65,8 @@ describe('server', () => {
         db.init.mockResolvedValue();
         db.teardown.mockResolvedValue();
 
-        require('../src/server');
-        await flush();
+        const { startServer } = require('../src/server');
+        await startServer();
 
         process.emit('SIGINT');
         await flush();
@@ -72,8 +80,8 @@ describe('server', () => {
         db.init.mockResolvedValue();
         db.teardown.mockRejectedValue(new Error('disconnect failed'));
 
-        require('../src/server');
-        await flush();
+        const { startServer } = require('../src/server');
+        await startServer();
 
         process.emit('SIGTERM');
         await flush();
@@ -87,8 +95,8 @@ describe('server', () => {
         db.init.mockResolvedValue();
         db.teardown.mockResolvedValue();
 
-        require('../src/server');
-        await flush();
+        const { startServer } = require('../src/server');
+        await startServer();
 
         process.emit('SIGUSR2');
         await flush();

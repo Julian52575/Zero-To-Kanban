@@ -37,6 +37,7 @@ async function removeItem(id) {
 }
 
 module.exports = {
+    prisma,
     init,
     teardown,
     getItems,

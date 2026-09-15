@@ -15,3 +15,7 @@ model TodoItem {
   @@map("todo_items")
 }
 
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}
