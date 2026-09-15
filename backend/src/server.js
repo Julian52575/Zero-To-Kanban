@@ -6,8 +6,6 @@ const { EVENTS } = require("./events/events");
 
 const PORT = 3000;
 
-const { publishEvent } = require("./events/eventBus");
-
 async function startConsumers() {
   await startConsumeFor(EVENTS.TASK_CREATED, async (data,eventId) => {
     console.log(
@@ -51,15 +49,6 @@ async function startServer() {
     await db.init();
     await connectRabbitMQ();
     await startConsumers();
-
-    await publishEvent(EVENTS.TASK_CREATED, {
-      taskId: "task-1",
-      projectId: "project-1",
-      name: "Sample Task",
-      status: "TODO",
-      priority: 1,
-      deadline: null,
-    });
 
 
     app.listen(PORT, () => {
