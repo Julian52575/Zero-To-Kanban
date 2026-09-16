@@ -1,6 +1,10 @@
 import React from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
 import type { Item } from '../types/item';
+import {
+    updateItem,
+    deleteItem,
+} from '../services/itemsApi';
 
 interface ItemDisplayProps {
     item: Item;
@@ -14,24 +18,18 @@ function ItemDisplay({
     onItemRemoval,
 }: ItemDisplayProps) {
     const toggleCompletion = () => {
-        fetch(`/items/${item.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                name: item.name,
-                completed: !item.completed,
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-            },
+        updateItem({
+            ...item,
+            completed: !item.completed,
         })
-            .then(r => r.json())
-            .then((updatedItem: Item) => onItemUpdate(updatedItem));
+            .then(updatedItem => onItemUpdate(updatedItem))
+            .catch(error => console.error(error));
     };
 
     const removeItem = () => {
-        fetch(`/items/${item.id}`, {
-            method: 'DELETE',
-        }).then(() => onItemRemoval(item));
+        deleteItem(item.id)
+            .then(() => onItemRemoval(item))
+            .catch(error => console.error(error));
     };
 
     return (
@@ -82,4 +80,3 @@ function ItemDisplay({
 }
 
 export default ItemDisplay;
-

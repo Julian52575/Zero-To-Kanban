@@ -1,26 +1,29 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
+import { createItem } from '../services/itemsApi';
+import type { Item } from '../types/item';
 
-function AddItemForm({ onNewItem }) {
+interface AddItemFormProps {
+    onNewItem: (item: Item) => void;
+}
+
+function AddItemForm({ onNewItem }: AddItemFormProps) {
     const [newItem, setNewItem] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
-    const submitNewItem = e => {
+    const submitNewItem = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSubmitting(true);
 
-        fetch('/items', {
-            method: 'POST',
-            body: JSON.stringify({ name: newItem }),
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(r => r.json())
+        createItem(newItem)
             .then(item => {
                 onNewItem(item);
                 setSubmitting(false);
                 setNewItem('');
+            })
+            .catch(error => {
+                console.error(error);
+                setSubmitting(false);
             });
     };
 
@@ -38,8 +41,7 @@ function AddItemForm({ onNewItem }) {
                 <Button
                     type="submit"
                     variant="success"
-                    disabled={!newItem.length}
-                    className={submitting ? 'disabled' : ''}
+                    disabled={!newItem.length || submitting}
                 >
                     {submitting ? 'Adding...' : 'Add Item'}
                 </Button>

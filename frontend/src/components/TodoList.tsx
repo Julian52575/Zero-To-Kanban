@@ -2,14 +2,15 @@ import React from 'react';
 import AddItemForm from './AddItemForm';
 import ItemDisplay from './ItemDisplay';
 import type { Item } from '../types/item';
+import { getItems } from '../services/itemsApi';
 
 function TodoList() {
     const [items, setItems] = React.useState<Item[] | null>(null);
 
     React.useEffect(() => {
-        fetch('/items')
-            .then(r => r.json())
-            .then((data: Item[]) => setItems(data));
+        getItems()
+            .then(data => setItems(data))
+            .catch(error => console.error(error));
     }, []);
 
     const onNewItem = React.useCallback(
@@ -101,4 +102,3 @@ function TodoList() {
 }
 
 export default TodoList;
-
