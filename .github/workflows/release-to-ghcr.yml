@@ -30,7 +30,7 @@ jobs:
             context: frontend
       fail-fast: true # fail all if any matrix jobs fails
     env:
-      IMAGE: ghcr.io/julian52575/zero-to-kanban-test-${{ matrix.image }}
+      IMAGE: ghcr.io/julian52575/zero-to-kanban-${{ matrix.image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -57,7 +57,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.event_name == 'release' }}
             type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
           labels: |
-            org.opencontainers.image.description=Zero To Kanban Test ${{ matrix.image }} image
+            org.opencontainers.image.description=Zero To Kanban ${{ matrix.image }} image
             org.opencontainers.image.licenses=MIT
 
       - name: Build and push Docker image
