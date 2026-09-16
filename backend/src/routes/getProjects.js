@@ -1,3 +1,3 @@
 const projectController = require('../controllers/projectController');
 
-module.exports = projectController.createProject;
+module.exports = projectController.getProjects;
