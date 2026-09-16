@@ -47,12 +47,6 @@ body:
     validations:
       required: true
 
-  - type: markdown
-    attributes:
-      value: |
-        ---
-        🧠 **The fields below requires teamwork to achieve the best decision. You should draft them first and wait for team feedbacks.**
-
   - type: dropdown
     id: decision
     attributes:
