@@ -15,3 +15,11 @@ model TodoItem {
   @@map("todo_items")
 }
 
+model Project {
+  id        String  @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  @@map("projects")
+}
+

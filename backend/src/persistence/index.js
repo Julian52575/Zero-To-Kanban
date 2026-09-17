@@ -36,6 +36,25 @@ async function removeItem(id) {
     await prisma.todoItem.delete({ where: { id } });
 }
 
+async function createProject(project) {
+    return prisma.project.create({
+        data: {
+            id: project.id,
+            name: project.name,
+        },
+    });
+}
+
+async function getProjects() {
+    return prisma.project.findMany();
+}
+
+async function getProject(id) {
+    return prisma.project.findUnique({
+        where: { id },
+    });
+}
+
 module.exports = {
     init,
     teardown,
@@ -44,4 +63,7 @@ module.exports = {
     storeItem,
     updateItem,
     removeItem,
+    createProject,
+    getProjects,
+    getProject,
 };

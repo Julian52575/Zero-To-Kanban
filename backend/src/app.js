@@ -5,6 +5,10 @@ const addItem = require('./routes/addItem');
 const updateItem = require('./routes/updateItem');
 const deleteItem = require('./routes/deleteItem');
 
+const createProject = require('./routes/createProject');
+
+const { validateCreateProject, } = require('./middlewares/projectValidation');
+
 const app = express();
 
 app.disable('x-powered-by');
