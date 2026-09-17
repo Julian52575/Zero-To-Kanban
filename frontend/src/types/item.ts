@@ -1,5 +1,1 @@
-export interface Item {
-    id: string;
-    name: string;
-    completed: boolean;
-}
+export type { Item } from '../schemas/itemSchema';

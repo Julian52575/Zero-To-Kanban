@@ -1,9 +1,20 @@
+export class ApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+    }
+}
+
 const apiClient = {
     get: async <T>(url: string): Promise<T> => {
         const response = await fetch(url);
-
         if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
+            throw new ApiError(
+                response.status,
+                `HTTP error: ${response.status}`,
+            );
         }
         return response.json();
     },
@@ -17,7 +28,10 @@ const apiClient = {
             body: JSON.stringify(body),
         });
         if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
+            throw new ApiError(
+                response.status,
+                `HTTP error: ${response.status}`,
+            );
         }
         return response.json();
     },
@@ -31,7 +45,10 @@ const apiClient = {
             body: JSON.stringify(body),
         });
         if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
+            throw new ApiError(
+                response.status,
+                `HTTP error: ${response.status}`,
+            );
         }
         return response.json();
     },
@@ -41,7 +58,10 @@ const apiClient = {
             method: 'DELETE',
         });
         if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
+            throw new ApiError(
+                response.status,
+                `HTTP error: ${response.status}`,
+            );
         }
     },
 };

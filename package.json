@@ -8,15 +8,16 @@
     "dev": "nodemon -L src/server.js"
   },
   "dependencies": {
+    "bootstrap": "^5.3.8",
     "express": "^5.2.1",
+    "mysql2": "^3.23.1",
     "react": "^19.2.8",
     "react-bootstrap": "^1.6.8",
     "react-dom": "^19.2.8",
-    "bootstrap": "^5.3.8",
-    "mysql2": "^3.23.1",
     "sqlite3": "^5.1.7",
     "uuid": "^13.0.0",
-    "wait-port": "^1.1.0"
+    "wait-port": "^1.1.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

@@ -5,38 +5,53 @@ import {
     updateItem,
     deleteItem,
 } from '../services/itemsApi';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface ItemDisplayProps {
     item: Item;
     onItemUpdate: (item: Item) => void;
     onItemRemoval: (item: Item) => void;
 }
-
 function ItemDisplay({
     item,
     onItemUpdate,
     onItemRemoval,
 }: ItemDisplayProps) {
+    const [error, setError] = React.useState<string | null>(null);
     const toggleCompletion = () => {
+        setError(null);
         updateItem({
             ...item,
             completed: !item.completed,
         })
             .then(updatedItem => onItemUpdate(updatedItem))
-            .catch(error => console.error(error));
+            .catch(error => {
+                console.error(error);
+                setError(getErrorMessage(error));
+            });
     };
-
     const removeItem = () => {
+        setError(null);
+
         deleteItem(item.id)
             .then(() => onItemRemoval(item))
-            .catch(error => console.error(error));
+            .catch(error => {
+                console.error(error);
+                setError(getErrorMessage(error));
+            });
     };
-
     return (
         <Container
             fluid
             className={`item ${item.completed ? 'completed' : ''}`}
         >
+            {error && (
+                <Row>
+                    <Col className="text-danger">
+                        {error}
+                    </Col>
+                </Row>
+            )}
             <Row>
                 <Col xs={1} className="text-center">
                     <Button
@@ -59,11 +74,9 @@ function ItemDisplay({
                         />
                     </Button>
                 </Col>
-
                 <Col xs={10} className="name">
                     {item.name}
                 </Col>
-
                 <Col xs={1} className="text-center remove">
                     <Button
                         size="sm"
