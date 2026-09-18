@@ -6,9 +6,12 @@ function App() {
     return (
         <Container>
             <Row>
-                <Col md={{ offset: 3, span: 6 }}>
+                <Col md={{ offset: 0, span: 4 }}>
                     <TodoList />
                 </Col>
+                <Col md={{ offset: 1, span: 4 }}> </Col>
+                <Col md={{ offset: 2, span: 4 }}> </Col>
+                <Col md={{ offset: 3, span: 4 }}> </Col>
             </Row>
         </Container>
     );
