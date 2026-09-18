@@ -5,6 +5,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 
 const authenticated = require('./middleware/authenticated');
+const { loginLimiter, registerLimiter } = require('./middleware/rateLimit');
 const verify = require('./routes/verify');
 const login = require('./routes/login');
 const register = require('./routes/register');
@@ -18,6 +19,10 @@ function createApp() {
     const app = express();
 
     app.disable('x-powered-by');
+    // Behind Traefik: trust exactly one hop (the proxy container) so
+    // req.ip / X-Forwarded-For resolve to the real client IP -- needed for
+    // express-rate-limit to key by client rather than by Traefik's IP.
+    app.set('trust proxy', 1);
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
     app.use(cookieParser());
@@ -30,8 +35,8 @@ function createApp() {
     app.get('/internal/verify', verify);
 
     // Public auth API.
-    app.post('/auth/register', register);
-    app.post('/auth/login', login);
+    app.post('/auth/register', registerLimiter, register);
+    app.post('/auth/login', loginLimiter, login);
     app.post('/auth/logout', logout);
 
     // Authenticated auth API.
