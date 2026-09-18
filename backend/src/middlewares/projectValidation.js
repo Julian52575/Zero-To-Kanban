@@ -1,11 +1,15 @@
-function validateCreateProject(req, res, next) {
-    const { name } = req.body;
+const { createProjectSchema } = require('../schemas/projectSchema');
 
-    if (typeof name !== 'string' || name.trim() === '') {
+function validateCreateProject(req, res, next) {
+    const result = createProjectSchema.safeParse(req.body);
+
+    if (!result.success) {
         return res.status(400).json({
-            error: 'name must be a non-empty string',
+            error: result.error.issues,
         });
     }
+
+    req.body = result.data;
 
     next();
 }
