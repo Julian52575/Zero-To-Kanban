@@ -143,6 +143,9 @@
               # In-repository Podman configuration
               # ------------------------------------------------------------
 
+              # Enforce podman backend usage
+              export PODMAN_COMPOSE_PROVIDER="$(command -v podman-compose)"
+
               export PODMAN_CONFIG_DIR="$PWD/.config/podman"
               export CONTAINERS_CONF="$PODMAN_CONFIG_DIR/containers.conf"
               export CONTAINERS_STORAGE_CONF="$PODMAN_CONFIG_DIR/storage.conf"

@@ -18,6 +18,8 @@
 # ./auth or a Dockerfile run `just rm; just up` to force a clean rebuild
 # (podman-compose's `--build` often misses a changed COPY).
 
+# This docker-compose is meant for local development
+
 services:
   proxy:
     image: docker.io/library/traefik:v3.3
@@ -65,11 +67,11 @@ services:
       - todo-db-data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo}"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo} -d ${POSTGRES_DB:-todo}"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+      start_period: 1s
 
   # The login service owns its own database -- separate blast radius, separate
   # migrations and backups from the app data in `db`, and its own credentials
@@ -124,12 +126,15 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dev.Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}?schema=public
     depends_on:
       db:
         condition: service_healthy
       auth:
+        condition: service_started
+      proxy:
         condition: service_started
     labels:
       # Middleware DEFINITIONS live on the proxy -- the first container up --
@@ -156,23 +161,24 @@ services:
       - traefik.http.services.backend.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/items', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+      start_period: 1s
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dev.Dockerfile
     depends_on:
-      auth:
-        condition: service_started
+      backend:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.frontend.rule=PathPrefix(`/`)
       - traefik.http.routers.frontend.priority=1        # catch-all: lowest priority
-      - traefik.http.services.frontend.loadbalancer.server.port=5173
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
       # Guard: same as backend -- an unauthenticated hit is redirected to /login.
       - traefik.http.routers.frontend.middlewares=strip-identity@docker,require-login@docker
     restart: unless-stopped
