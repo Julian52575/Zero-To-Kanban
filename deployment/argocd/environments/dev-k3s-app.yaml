@@ -17,7 +17,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zero-to-kanban-dev-k3s
+  name: ztk-dev-k3s
   namespace: argocd
 spec:
   project: default
@@ -31,7 +31,7 @@ spec:
         - values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: zero-to-kanban-dev-k3s
+    namespace: ztk-dev-k3s
   syncPolicy:
     automated:
       prune: true
