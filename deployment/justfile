@@ -16,6 +16,7 @@ export KUBECONFIG := kubeconfig
 up-local: _k3s-ready _argocd-base
     #!/usr/bin/env bash
     set -euo pipefail
+    branch="{{env_var_or_default("GIT_BRANCH", "main")}}"
     if ! kubectl -n argocd get deployment argocd-repo-server -o jsonpath='{.spec.template.spec.volumes[?(@.name=="local-repo")].name}' | grep -q local-repo; then
         echo "argocd: bind-mounting {{repo_root}} into argocd-repo-server (one-time)..."
         kubectl -n argocd patch deployment argocd-repo-server --type=json -p '[
@@ -28,10 +29,11 @@ up-local: _k3s-ready _argocd-base
     else
         echo "argocd: argocd-repo-server already has the local-repo mount"
     fi
-    sed "s#__REPO_ROOT__#{{repo_root}}#" "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
+    sed -e "s#__REPO_ROOT__#{{repo_root}}#" -e "s#__TARGET_REVISION__#$branch#" \
+      "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
       | kubectl apply -n argocd -f -
-    echo "argocd: zero-to-kanban-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}})" | lolcat
-    echo "  -> 'git commit' locally (no push needed); 'just refresh-local' to sync immediately"
+    echo "argocd: zero-to-kanban-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}}, branch $branch)" | lolcat
+    echo "  -> 'git commit' locally on $branch (no push needed); 'just refresh-local' to sync immediately"
     just _argocd-info
 
 # Bootstrap Argo CD syncing from git -- the normal GitOps flow: commit + push to pick up edits
