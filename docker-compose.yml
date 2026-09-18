@@ -45,6 +45,7 @@ services:
       start_period: 5s
 
   backend:
+    #image: ghcr.io/julian52575/zero-to-kanban-backend:manual-test #latest
     build:
       context: ./backend
     environment:
@@ -66,6 +67,7 @@ services:
       start_period: 5s
 
   frontend:
+    #image: ghcr.io/julian52575/zero-to-kanban-frontend:manual-test #latest
     build:
       context: ./frontend
     labels:
