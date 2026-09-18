@@ -1,0 +1,36 @@
+# Overrides for the dev environment. Used by the Argo CD Application in
+# deployment/argocd/environments/dev-app.yaml.
+
+backend:
+  image:
+    tag: manual-test
+  replicaCount: 1
+
+frontend:
+  image:
+    tag: manual-test
+  replicaCount: 1
+  # The dev image runs the Vite/Rolldown dev server in-cluster, not the
+  # prebuilt static bundle the base values.yaml's 128Mi limit assumes -- the
+  # dev server routinely needs several hundred MB and was getting OOM-killed
+  # (memory.oom.group), taking down the whole rootless k3s node with it.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+postgresql:
+  # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
+  # catalog restructuring and now only publishes a rolling `latest` -- the
+  # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
+  # available frozen under the bitnamilegacy mirror; pin that here.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
+  primary:
+    persistence:
+      size: 1Gi
