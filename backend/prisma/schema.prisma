@@ -14,4 +14,3 @@ model TodoItem {
 
   @@map("todo_items")
 }
-
