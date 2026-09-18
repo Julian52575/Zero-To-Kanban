@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in &middot; Zero-To-Kaban</title>
+    <title>Create account &middot; Zero-To-Kaban</title>
     <style>
       :root { color-scheme: light dark; }
       * { box-sizing: border-box; }
@@ -32,7 +32,8 @@
   </head>
   <body>
     <form id="form" novalidate>
-      <h1>Sign in</h1>
+      <h1>Create account</h1>
+      <p class="hint">Username: 3-32 characters, letters, digits, "-" or "_". Password: 8+ characters.</p>
       <label>Username
         <input
           type="text"
@@ -50,13 +51,25 @@
         <input
           type="password"
           name="password"
-          autocomplete="current-password"
+          autocomplete="new-password"
+          minlength="8"
+          maxlength="72"
+          required
+        />
+      </label>
+      <label>Confirm password
+        <input
+          type="password"
+          name="passwordConfirm"
+          autocomplete="new-password"
+          minlength="8"
+          maxlength="72"
           required
         />
       </label>
       <div class="error" id="error" role="alert"></div>
-      <button type="submit">Continue</button>
-      <p class="switch">No account yet? <a id="register-link" href="/register">Create one</a></p>
+      <button type="submit">Create account</button>
+      <p class="switch">Already have an account? <a id="login-link" href="/login">Sign in</a></p>
     </form>
 
     <script>
@@ -64,10 +77,7 @@
       // Keep only same-site absolute paths (the server enforces this too).
       const raw = params.get("next") || "/";
       const next = /^\/(?!\/)/.test(raw) ? raw : "/";
-      // Carry ?next through to the register page so a guarded redirect
-      // survives a "create an account" detour.
-      document.getElementById("register-link").href =
-        "/register?next=" + encodeURIComponent(next);
+      document.getElementById("login-link").href = "/login?next=" + encodeURIComponent(next);
 
       document.getElementById("form").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -75,10 +85,19 @@
         error.textContent = "";
 
         const form = event.currentTarget;
-        const res = await fetch("/auth/login", {
+        if (form.password.value !== form.passwordConfirm.value) {
+          error.textContent = "Passwords do not match";
+          return;
+        }
+
+        const res = await fetch("/auth/register", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ username: form.username.value, password: form.password.value, next }),
+          body: JSON.stringify({
+            username: form.username.value,
+            password: form.password.value,
+            next,
+          }),
         });
 
         if (res.ok) {
@@ -87,7 +106,7 @@
           return;
         }
         const data = await res.json().catch(() => ({}));
-        error.textContent = data.error || "Sign in failed";
+        error.textContent = data.error || "Registration failed";
       });
     </script>
   </body>

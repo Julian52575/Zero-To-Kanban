@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const authenticated = require('./middleware/authenticated');
 const verify = require('./routes/verify');
 const login = require('./routes/login');
+const register = require('./routes/register');
 const logout = require('./routes/logout');
 const logoutAll = require('./routes/logoutAll');
 const me = require('./routes/me');
@@ -28,7 +29,8 @@ function createApp() {
     // /internal, so this is only reachable from Traefik itself.
     app.get('/internal/verify', verify);
 
-    // Public auth API. TEMPORARY: login is username-only get-or-create.
+    // Public auth API.
+    app.post('/auth/register', register);
     app.post('/auth/login', login);
     app.post('/auth/logout', logout);
 
@@ -39,6 +41,7 @@ function createApp() {
     // Minimal server-rendered page so the entire SPA can sit behind the guard
     // -- the sign-in screen does not depend on the frontend bundle.
     app.get('/login', (req, res) => res.sendFile(path.join(PAGES_DIR, 'login.html')));
+    app.get('/register', (req, res) => res.sendFile(path.join(PAGES_DIR, 'register.html')));
 
     // eslint-disable-next-line no-unused-vars
     app.use((err, req, res, next) => {

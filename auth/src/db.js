@@ -21,20 +21,26 @@ function findUserByUsername(username) {
     return prisma.user.findUnique({ where: { username: username.toLowerCase() } });
 }
 
-// TEMPORARY: no credentials, so signing in just resolves a user row, creating
-// it on first use. The web team replaces this with a real register/login split.
-async function getOrCreateUser(username) {
-    const name = username.toLowerCase();
-    const existing = await findUserByUsername(name);
-    if (existing) {
-        return existing;
+// Thrown when a username is already taken. Kept distinct from a generic
+// Prisma error so routes can turn it into a clean 409 without inspecting
+// Prisma error codes themselves.
+class UsernameTakenError extends Error {
+    constructor(username) {
+        super(`username already taken: ${username}`);
+        this.name = 'UsernameTakenError';
     }
+}
+
+// Creates a new user row with an already-hashed password. Throws
+// UsernameTakenError on a unique-constraint conflict (including the
+// concurrent-registration race).
+async function createUser(username, passwordHash) {
+    const name = username.toLowerCase();
     try {
-        return await prisma.user.create({ data: { username: name } });
+        return await prisma.user.create({ data: { username: name, passwordHash } });
     } catch (err) {
-        // Unique violation -- a concurrent request created it first. Re-read.
         if (err && err.code === 'P2002') {
-            return findUserByUsername(name);
+            throw new UsernameTakenError(name);
         }
         throw err;
     }
@@ -56,6 +62,7 @@ module.exports = {
     teardown,
     findUserById,
     findUserByUsername,
-    getOrCreateUser,
+    createUser,
     bumpTokenVersion,
+    UsernameTakenError,
 };
