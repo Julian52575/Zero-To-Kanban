@@ -1,10 +1,14 @@
-# Dev-mode image for the Vite/React frontend that lives in ./frontend.
-# Runs the Vite dev server with HMR; not a production build.
-
 FROM node:24-slim
+
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+
+COPY package.json package-lock.json .
+
+RUN npm install
+RUN npm i -g serve
+
 COPY . .
-EXPOSE 5173
-CMD ["npx", "vite", "--host", "0.0.0.0"]
+RUN npm run build
+EXPOSE 3000
+
+CMD [ "serve", "-s", "dist" ]
