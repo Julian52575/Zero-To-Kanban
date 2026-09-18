@@ -10,6 +10,8 @@
 # a Dockerfile run `just rm; just up` to force a clean rebuild (podman-compose's
 # `--build` often misses a changed COPY).
 
+# This docker-compose is meant for local development
+
 services:
   proxy:
     image: docker.io/library/traefik:v3.3
@@ -52,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      proxy:
+        condition: service_started
     labels:
       - traefik.enable=true
       - traefik.http.routers.backend.rule=PathPrefix(`/items`)
@@ -68,11 +72,15 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dev.Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.frontend.rule=PathPrefix(`/`)
       - traefik.http.routers.frontend.priority=1        # catch-all: lowest priority
-      - traefik.http.services.frontend.loadbalancer.server.port=5173
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
     restart: unless-stopped
 
 volumes:
