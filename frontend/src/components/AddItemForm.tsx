@@ -29,6 +29,8 @@ function AddItemForm({ onNewItem }: AddItemFormProps) {
                 setSubmitting(false);
             });
     };
+    const isDisabled = submitting || newItem.trim().length === 0;
+
     return (
         <Form onSubmit={submitNewItem}>
             <InputGroup className="mb-3">
@@ -42,7 +44,8 @@ function AddItemForm({ onNewItem }: AddItemFormProps) {
                 <Button
                     type="submit"
                     variant="success"
-                    disabled={!newItem.length || submitting}
+                    className={isDisabled ? 'disabled' : ''}
+                    disabled={isDisabled}
                 >
                     {submitting ? 'Adding...' : 'Add Item'}
                 </Button>
