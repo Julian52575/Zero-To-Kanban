@@ -9,7 +9,7 @@ metadata:
     {{- include "zero-to-kanban.labels" . | nindent 4 }}
 spec:
   forwardAuth:
-    address: http://{{ include "zero-to-kanban.fullname" . }}-auth:4000/internal/verify
+    address: http://{{ include "zero-to-kanban.fullname" . }}-auth.{{ .Release.Namespace }}.svc.cluster.local:4000/internal/verify
     trustForwardHeader: true
     authResponseHeaders:
       - X-Auth-User-Id
