@@ -51,7 +51,7 @@ frontend:
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
-  containerPort: 5173
+  containerPort: 3000
   resources:
     requests:
       cpu: 50m
