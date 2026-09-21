@@ -1,0 +1,11 @@
+node_modules
+coverage
+generated
+
+.env
+.env.example
+
+# Docker
+Dockerfile
+Dev.Dockerfile
+.dockerignore
