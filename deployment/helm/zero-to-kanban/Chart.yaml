@@ -1,6 +1,6 @@
 apiVersion: v2
 name: zero-to-kanban
-description: Helm chart for the Zero To Kanban Test app (backend, frontend, Postgres)
+description: Helm chart for the Zero To Kanban Test app (backend, frontend, auth, 2x Postgres)
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
@@ -9,3 +9,8 @@ dependencies:
     version: "16.x.x"
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
+  - name: postgresql
+    alias: authdb
+    version: "16.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: authdb.enabled

@@ -2,8 +2,10 @@
 # Requires the Traefik CRDs (IngressRoute) installed in-cluster -- see
 # https://doc.traefik.io/traefik/reference/dynamic-configuration/kubernetes-crd/
 #
-# Routing mirrors the docker-compose Traefik proxy: /items -> backend
-# (priority 10), everything else -> frontend (priority 1, catch-all).
+# Routing mirrors the docker-compose Traefik proxy: /auth, /login, /register
+# -> auth (priority 100, public), /items -> backend (priority 10), everything
+# else -> frontend (priority 1, catch-all). backend and frontend are guarded
+# by strip-identity + require-login (ForwardAuth to the auth service).
 #
 # No Host() match -- routes on path alone, so any hostname/IP reaching
 # these entryPoints works with no /etc/hosts entry needed. This also keeps
@@ -20,15 +22,27 @@ spec:
   entryPoints:
     {{- toYaml .Values.ingress.entryPoints | nindent 4 }}
   routes:
+    - match: PathPrefix(`/auth`) || Path(`/login`) || Path(`/register`)
+      kind: Rule
+      priority: 100
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-auth
+          port: 4000
     - match: PathPrefix(`/items`)
       kind: Rule
       priority: 10
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-strip-identity
+        - name: {{ include "zero-to-kanban.fullname" . }}-require-login
       services:
         - name: {{ include "zero-to-kanban.fullname" . }}-backend
           port: 3000
     - match: PathPrefix(`/`)
       kind: Rule
       priority: 1
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-strip-identity
+        - name: {{ include "zero-to-kanban.fullname" . }}-require-login
       services:
         - name: {{ include "zero-to-kanban.fullname" . }}-frontend
           port: 5173

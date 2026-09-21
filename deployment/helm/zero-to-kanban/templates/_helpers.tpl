@@ -39,3 +39,25 @@ Name of the Secret holding the Postgres password.
 {{- define "zero-to-kanban.postgresql.secretKey" -}}
 {{- .Values.postgresql.auth.secretKeys.userPasswordKey | default "password" -}}
 {{- end -}}
+
+{{/* Hostname of the auth-dedicated postgresql (authdb alias) Service */}}
+{{- define "zero-to-kanban.authdb.host" -}}
+{{- printf "%s-authdb" .Release.Name -}}
+{{- end -}}
+
+{{- define "zero-to-kanban.authdb.secretName" -}}
+{{- if .Values.authdb.auth.existingSecret -}}
+{{- .Values.authdb.auth.existingSecret -}}
+{{- else -}}
+{{- include "zero-to-kanban.authdb.host" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "zero-to-kanban.authdb.secretKey" -}}
+{{- .Values.authdb.auth.secretKeys.userPasswordKey | default "password" -}}
+{{- end -}}
+
+{{/* Name of the Secret holding SESSION_SECRET */}}
+{{- define "zero-to-kanban.auth.secretName" -}}
+{{- default (printf "%s-auth" (include "zero-to-kanban.fullname" .)) .Values.auth.existingSecret -}}
+{{- end -}}

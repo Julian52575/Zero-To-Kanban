@@ -17,6 +17,13 @@ backend:
     tag: latest
   replicaCount: 4
 
+auth:
+  image:
+    tag: latest
+  replicaCount: 2
+  cookieSecure: "true"
+  existingSecret: zero-to-kanban-prod-auth
+
 frontend:
   image:
     tag: latest
@@ -35,3 +42,13 @@ postgresql:
   primary:
     persistence:
       size: 10Gi
+
+# Pre-create the auth DB Secret too (key: password):
+#   kubectl create secret generic zero-to-kanban-prod-authdb \
+#     --namespace zero-to-kanban-prod --from-literal=password='<strong-password>'
+authdb:
+  auth:
+    existingSecret: zero-to-kanban-prod-authdb
+  primary:
+    persistence:
+      size: 5Gi

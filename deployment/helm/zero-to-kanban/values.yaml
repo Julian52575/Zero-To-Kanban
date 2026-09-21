@@ -18,6 +18,33 @@ backend:
       cpu: 500m
       memory: 256Mi
 
+auth:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-auth
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 4000
+  # Set "true" once the proxy terminates HTTPS (session cookie gets Secure).
+  cookieSecure: "false"
+  # Secret holding the session-signing key (JWT HS256). When empty, the chart
+  # does NOT create one -- dev must set sessionSecret below; prod should use
+  # existingSecret:
+  #   kubectl create secret generic zero-to-kanban-prod-auth \
+  #     --namespace zero-to-kanban-prod \
+  #     --from-literal=session-secret="$(openssl rand -hex 32)"
+  existingSecret: ""
+  existingSecretKey: session-secret
+  # Plaintext fallback, disposable dev only. Ignored when existingSecret is set.
+  sessionSecret: dev-only-change-me
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 frontend:
   image:
     repository: ghcr.io/julian52575/zero-to-kanban-frontend # closer to image name
@@ -60,6 +87,22 @@ postgresql:
     #   kubectl create secret generic zero-to-kanban-prod-postgresql \
     #     --namespace zero-to-kanban-prod \
     #     --from-literal=password='<strong-password>'
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Dedicated Postgres for the auth service (alias of the bitnami subchart):
+# separate credentials, storage and blast radius from the app DB above.
+authdb:
+  enabled: true
+  auth:
+    username: authuser
+    database: auth
+    password: authpass
     existingSecret: ""
     secretKeys:
       userPasswordKey: password

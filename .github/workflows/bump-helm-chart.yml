@@ -56,6 +56,7 @@ jobs:
         run: |
           yq -i ".backend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
           yq -i ".frontend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
+          yq -i ".auth.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
           yq -i ".appVersion = strenv(TAG)" deployment/helm/zero-to-kanban/Chart.yaml
 
       - name: Upload bumped chart files

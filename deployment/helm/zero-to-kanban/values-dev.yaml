@@ -4,11 +4,19 @@
 backend:
   image:
     tag: manual-test
+    pullPolicy: Always
+  replicaCount: 1
+
+auth:
+  image:
+    tag: manual-test
+    pullPolicy: Always
   replicaCount: 1
 
 frontend:
   image:
     tag: manual-test
+    pullPolicy: Always
   replicaCount: 1
   # The dev image runs the Vite/Rolldown dev server in-cluster, not the
   # prebuilt static bundle the base values.yaml's 128Mi limit assumes -- the
@@ -27,6 +35,15 @@ postgresql:
   # catalog restructuring and now only publishes a rolling `latest` -- the
   # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
   # available frozen under the bitnamilegacy mirror; pin that here.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
+  primary:
+    persistence:
+      size: 1Gi
+
+authdb:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql
