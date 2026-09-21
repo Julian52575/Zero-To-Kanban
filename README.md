@@ -48,6 +48,13 @@ just              #  list all available shortcuts
 
 Once up, the frontend can be accessed at `localhost:$PROXY_PORT`. `$PROXY_PORT` is defined in the `.env`.
 
+### Authentication
+
+Every route except the sign-in flow is behind a login gate. Traefik runs the
+`auth` service's ForwardAuth check on each request and redirects to `/login`
+(browser) or returns `401` (API) when there is no valid session cookie. On
+success it injects `X-Auth-User-Id` / `X-Auth-User-Name` for the upstream.
+
 ### Working on the app
 
 **WIP**
