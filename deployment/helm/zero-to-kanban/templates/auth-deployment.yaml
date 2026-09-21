@@ -30,24 +30,17 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.auth.containerPort }}
-          # DATABASE_URL is assembled at start from the authdb Secret, same
-          # pattern as the backend. Migrations run before the server starts.
-          command:
-            - sh
-            - -c
-            - export DATABASE_URL="postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):5432/$(DB_NAME)?schema=public" && npx prisma migrate deploy && node src/index.js
           env:
-            - name: DB_USER
-              value: {{ .Values.authdb.auth.username | quote }}
-            - name: DB_NAME
-              value: {{ .Values.authdb.auth.database | quote }}
-            - name: DB_HOST
-              value: {{ include "zero-to-kanban.authdb.host" . | quote }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "zero-to-kanban.authdb.secretName" . }}
                   key: {{ include "zero-to-kanban.authdb.secretKey" . }}
+            # Composed by Kubernetes from DB_PASSWORD (declared above, so $(...)
+            # expands): the plaintext password never appears in the manifest.
+            # The image's own CMD runs migrations and starts the server.
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.authdb.auth.username }}:$(DB_PASSWORD)@{{ include "zero-to-kanban.authdb.host" . }}:5432/{{ .Values.authdb.auth.database }}?schema=public"
             - name: SESSION_SECRET
               valueFrom:
                 secretKeyRef:
