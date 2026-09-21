@@ -1,7 +1,7 @@
 const taskService = require('../services/taskService');
 
 async function getTasks(req, res) {
-  const tasks = await taskService.getTasks();
+  const tasks = await taskService.getTasks(req.params.projectId);
 
   res.json(tasks);
 }
@@ -13,7 +13,18 @@ async function getTask(req, res) {
 }
 
 async function createTask(req, res) {
-  const task = await taskService.createTask(req.body);
+  const { projectId } = req.params;
+  const { columnId, title, description, assigneeId } = req.body;
+
+  if (!columnId || !title) {
+    return res.status(400).json({ error: "columnId and title fields are required" });
+  }
+
+  const task = await taskService.storeTask(columnId, creatorId, {
+      title,
+      description,
+      assigneeId
+  });
 
   res.status(201).json(task);
 }
@@ -23,7 +34,7 @@ async function updateTask(req, res) {
     req.params.id,
     req.body
   );
-
+  
   res.json(task);
 }
 

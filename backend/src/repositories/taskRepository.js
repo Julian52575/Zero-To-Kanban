@@ -1,23 +1,23 @@
 const db = require('../persistence');
 
-async function getAll() {
-  return db.getItems();
+async function getAll(projectId) {
+  return db.getTasks(projectId);
 }
 
 async function getById(id) {
-  return db.getItem(id);
+  return db.getTask(id);
 }
 
-async function create(task) {
-  return db.storeItem(task);
+async function create(columnId, creatorId, taskData) {
+  return db.storeTask(columnId, creatorId, taskData);
 }
 
-async function update(id, task) {
-  return db.updateItem(id, task);
+async function update(id, taskData) {
+  return db.updateTask(id, taskData);
 }
 
 async function deleteById(id) {
-  return db.removeItem(id);
+  return db.removeTask(id);
 }
 
 module.exports = {
