@@ -9,6 +9,10 @@ async function getItems() {
     return itemRepository.getAll();
 }
 
+async function getItem(id) {
+    return itemRepository.getById(id);
+}
+
 async function createItem(data) {
     const item = {
         id: uuid(),
@@ -41,6 +45,7 @@ async function updateItem(id, data) {
 
 module.exports = {
     getItems,
+    getItem,
     createItem,
     deleteItem,
     updateItem,
