@@ -133,12 +133,12 @@ services:
       - "15672:15672"
     # Run as the image's own `rabbitmq` user for the whole container lifetime
     user: rabbitmq
-    # The image declares `VOLUME /var/lib/rabbitmq`, so podman/docker
-    # auto-creates an anonymous volume there even with no `volumes:` entry
-    # here. tmpfs sidesteps that (fresh on every start, never persisted or
-    # reused); fine since queue data is disposable for local dev.
-    tmpfs:
-      - /var/lib/rabbitmq
+    volumes:
+      # `:U` chowns the volume to the container's uid (rabbitmq) on start.
+      # Needed because we bypass the entrypoint's own root->rabbitmq chown
+      # step by never starting as root (see `user:` above), so nothing else
+      # would make a fresh volume writable by the non-root rabbitmq user.
+      - rabbitmq-data:/var/lib/rabbitmq:U
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
       interval: 1s
@@ -220,3 +220,4 @@ services:
 volumes:
   todo-db-data:
   auth-db-data:
+  rabbitmq-data:
