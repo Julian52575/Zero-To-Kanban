@@ -7,7 +7,7 @@ function TodoList() {
     const [items, setItems] = React.useState<Item[] | null>(null);
 
     React.useEffect(() => {
-        fetch('/items')
+        fetch('/api/items')
             .then(r => r.json())
             .then((data: Item[]) => setItems(data));
     }, []);
