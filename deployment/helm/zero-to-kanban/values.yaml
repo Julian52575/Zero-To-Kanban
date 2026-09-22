@@ -31,7 +31,7 @@ auth:
   # does NOT create one -- dev must set sessionSecret below; prod should use
   # existingSecret:
   #   kubectl create secret generic zero-to-kanban-prod-auth \
-  #     --namespace zero-to-kanban-prod \
+  #     --namespace ztk-prod \
   #     --from-literal=session-secret="$(openssl rand -hex 32)"
   existingSecret: ""
   existingSecretKey: session-secret
@@ -85,7 +85,7 @@ postgresql:
     # `password` above is ignored and the bitnami subchart won't generate
     # its own Secret. Create it out-of-band, e.g.:
     #   kubectl create secret generic zero-to-kanban-prod-postgresql \
-    #     --namespace zero-to-kanban-prod \
+    #     --namespace ztk-prod \
     #     --from-literal=password='<strong-password>'
     existingSecret: ""
     secretKeys:

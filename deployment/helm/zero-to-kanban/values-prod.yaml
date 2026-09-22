@@ -5,9 +5,9 @@
 # before this is used against a real prod cluster.
 #
 # Postgres password: pre-create the Secret referenced below in the
-# zero-to-kanban-prod namespace before syncing this Application, e.g.:
+# ztk-prod namespace before syncing this Application, e.g.:
 #   kubectl create secret generic zero-to-kanban-prod-postgresql \
-#     --namespace zero-to-kanban-prod \
+#     --namespace ztk-prod \
 #     --from-literal=password='<strong-password>'
 # (or manage it via Sealed Secrets / External Secrets Operator instead of
 # kubectl directly). Argo CD never sees the plaintext value either way.
@@ -39,16 +39,29 @@ ingress:
 postgresql:
   auth:
     existingSecret: zero-to-kanban-prod-postgresql
+  # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
+  # catalog restructuring and now only publishes a rolling `latest` -- the
+  # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
+  # available frozen under the bitnamilegacy mirror; pin that here (see the
+  # same override in values-dev.yaml).
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   primary:
     persistence:
       size: 10Gi
 
 # Pre-create the auth DB Secret too (key: password):
 #   kubectl create secret generic zero-to-kanban-prod-authdb \
-#     --namespace zero-to-kanban-prod --from-literal=password='<strong-password>'
+#     --namespace ztk-prod --from-literal=password='<strong-password>'
 authdb:
   auth:
     existingSecret: zero-to-kanban-prod-authdb
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   primary:
     persistence:
       size: 5Gi
