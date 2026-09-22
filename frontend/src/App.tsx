@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
-import TodoList from './components/TodoListV2';
+import TodoList from './components/TodoList';
 
 function App() {
     return (
