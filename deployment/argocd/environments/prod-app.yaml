@@ -3,7 +3,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zero-to-kanban-prod
+  name: ztk-prod
   namespace: argocd
 spec:
   project: default
@@ -17,7 +17,7 @@ spec:
         - values-prod.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: zero-to-kanban-prod
+    namespace: ztk-prod
   syncPolicy:
     syncOptions:
       - CreateNamespace=true
