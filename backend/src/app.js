@@ -19,25 +19,29 @@ const {
 const app = express();
 
 app.disable('x-powered-by');
-
 app.use(express.json());
 
-app.get('/items', getItems);
-app.get('/items/:id', getItem);
-app.post('/items', addItem);
-app.put('/items/:id', updateItem);
-app.patch('/items/:id', updateItem);
-app.delete('/items/:id', deleteItem);
+const apiRouter = express.Router();
 
-app.get('/projects', getProjects);
-app.get('/projects/:id', getProject);
+
+apiRouter.get('/items', getItems);
+apiRouter.get('/items/:id', getItem);
+apiRouter.post('/items', addItem);
+apiRouter.put('/items/:id', updateItem);
+apiRouter.patch('/items/:id', updateItem);
+apiRouter.delete('/items/:id', deleteItem);
+
+
+apiRouter.get('/projects', getProjects);
+apiRouter.get('/projects/:id', getProject);
 console.log('validateCreateProject:', typeof validateCreateProject);
 console.log('createProject:', typeof createProject);
 console.log('createProject value:', createProject);
-app.post('/projects', validateCreateProject, createProject);
-app.delete('/projects/:id', deleteProject);
-app.put('/projects/:id', updateProject);
-app.patch('/projects/:id', updateProject);
+apiRouter.post('/projects', validateCreateProject, createProject);
+apiRouter.delete('/projects/:id', deleteProject);
+apiRouter.put('/projects/:id', updateProject);
+apiRouter.patch('/projects/:id', updateProject);
 
+app.use(apiRouter);
 
 module.exports = app;

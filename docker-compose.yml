@@ -189,7 +189,7 @@ services:
 
       - traefik.http.routers.backend.rule=PathPrefix(`/api`)
       - traefik.http.routers.backend.priority=10
-      - traefik.http.routers.backend.middlewares=backend-stripprefix
+      - traefik.http.routers.backend.middlewares=strip-identity@docker,require-login@docker,backend-stripprefix
       - traefik.http.services.backend.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:

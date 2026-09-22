@@ -13,9 +13,6 @@ async function createProject(req, res) {
 async function getProjects(req, res) {
     const projects = await projectService.getProjects();
 
-    const token = req.headers.authorization?.split(' ')[1];
-    console.log(`Token received in createProject: ${token}`);
-
     res.json(projects);
 }
 
