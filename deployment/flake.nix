@@ -102,7 +102,7 @@
             if [ -n "$K3S_NO_AUTOSTART" ]; then
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
               echo "in flake.nix for why plain 'k3s server --rootless ...' can fail on WSL):"
-              echo "  systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
+              echo "  setsid systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
               echo "    -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
               echo "    -- k3s server --rootless --write-kubeconfig $STATE_DIR/k3s.yaml --write-kubeconfig-mode 644 --data-dir $STATE_DIR/.k3s"
               return 2>/dev/null || exit 0
@@ -165,8 +165,10 @@
             else
               echo "k3s: starting rootless node (first boot can take a minute)..."
               CPU_RANGE="0-$(( $(nproc) - 1 ))"
-              echo "+ systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)" | lolcat
-              systemd-run --user --unit="$UNIT" --scope --collect \
+              echo "+ setsid systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)" | lolcat
+              # setsid: puts systemd-run (and the k3s it execs into via
+              # --scope) in its own session, detached from this terminal.
+              setsid systemd-run --user --unit="$UNIT" --scope --collect \
                 -p Delegate=yes -p CPUWeight=100 -p "AllowedCPUs=$CPU_RANGE" -p IOWeight=100 \
                 -- k3s server --rootless \
                      --write-kubeconfig "$KUBECONFIG_PATH" --write-kubeconfig-mode 644 \
