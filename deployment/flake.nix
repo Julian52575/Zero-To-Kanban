@@ -55,12 +55,16 @@
           # controllers are required for rootless". `systemd-run --user
           # --scope` asks the (lingering) user systemd manager to create the
           # process directly inside the delegated tree instead, sidestepping
-          # wherever the shell itself happens to live. The `-p CPUWeight=`
-          # / `-p AllowedCPUs=` / `-p IOWeight=` properties are required too
-          # (not just e.g. `-p CPUAccounting=yes`) -- in cgroup v2, systemd
-          # only actually turns on the `cpu`/`cpuset` controllers for real
-          # resource-control properties; accounting-only flags don't count,
-          # since basic cpu.stat is free without the controller.
+          # wherever the shell itself happens to live. `-p Delegate=yes` is
+          # required so the scope's cgroup subtree is actually writable by
+          # the child -- without it k3s fails with "failed to find cpuset
+          # cgroup (v2)" even when the parent slices have cpuset enabled in
+          # cgroup.subtree_control. The `-p CPUWeight=` / `-p AllowedCPUs=`
+          # / `-p IOWeight=` properties are required too (not just e.g.
+          # `-p CPUAccounting=yes`) -- in cgroup v2, systemd only actually
+          # turns on the `cpu`/`cpuset` controllers for real resource-control
+          # properties; accounting-only flags don't count, since basic
+          # cpu.stat is free without the controller.
           #
           # Env vars to opt out:
           #   K3S_NO_AUTOSTART=1  -- skip starting k3s entirely (manual mode)
@@ -72,7 +76,7 @@
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
               echo "in flake.nix for why plain 'k3s server --rootless ...' can fail on WSL):"
               echo "  systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
-              echo "    -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
+              echo "    -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
               echo "    -- k3s server --rootless --write-kubeconfig ./k3s.yaml --write-kubeconfig-mode 644 --data-dir ./.k3s"
               return 2>/dev/null || exit 0
             fi
@@ -119,9 +123,9 @@
             else
               echo "k3s: starting rootless node (first boot can take a minute)..."
               CPU_RANGE="0-$(( $(nproc) - 1 ))"
-              echo "+ systemd-run --user --unit=$UNIT --scope --collect -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)" | lolcat
+              echo "+ systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)" | lolcat
               systemd-run --user --unit="$UNIT" --scope --collect \
-                -p CPUWeight=100 -p "AllowedCPUs=$CPU_RANGE" -p IOWeight=100 \
+                -p Delegate=yes -p CPUWeight=100 -p "AllowedCPUs=$CPU_RANGE" -p IOWeight=100 \
                 -- k3s server --rootless \
                      --write-kubeconfig "$KUBECONFIG_PATH" --write-kubeconfig-mode 644 \
                      --data-dir "$DATA_DIR" \
