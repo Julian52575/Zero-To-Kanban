@@ -15,9 +15,9 @@ import ItemDisplay from './ItemDisplay';
 import './KanbanBoard.css';
 
 const COLUMNS: { id: ItemStatus; title: string }[] = [
-    { id: 'todo', title: 'À faire' },
-    { id: 'doing', title: 'En cours' },
-    { id: 'done', title: 'Terminé' },
+    { id: 'todo', title: 'To Do' },
+    { id: 'doing', title: 'Doing' },
+    { id: 'done', title: 'Done' },
 ];
 
 // Si l'item n'a pas encore de statut, on le déduit de "completed"
@@ -96,7 +96,7 @@ function KanbanColumn({
             </header>
             <div className="kanban-column-body">
                 {count === 0 && (
-                    <p className="kanban-empty">Glissez une tâche ici</p>
+                    <p className="kanban-empty">Drag tasks here</p>
                 )}
                 {children}
             </div>
