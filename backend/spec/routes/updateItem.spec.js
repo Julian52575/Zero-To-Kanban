@@ -7,6 +7,10 @@ jest.mock('../../src/repositories/itemRepository', () => ({
     getById: jest.fn(),
 }));
 
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
 const itemRepository = require('../../src/repositories/itemRepository');
 const updateItem = require('../../src/routes/updateItem');
 

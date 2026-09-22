@@ -6,6 +6,10 @@ jest.mock('../../src/repositories/itemRepository', () => ({
     deleteById: jest.fn(),
 }));
 
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
 const itemRepository = require('../../src/repositories/itemRepository');
 const deleteItem = require('../../src/routes/deleteItem');
 
