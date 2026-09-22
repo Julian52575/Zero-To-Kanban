@@ -137,12 +137,26 @@
             _api_ready() {
               KUBECONFIG="$KUBECONFIG_PATH" kubectl get --raw='/readyz' >/dev/null 2>&1
             }
-            _wait_ready() {
-              for _ in $(seq 120); do _api_ready && return 0; sleep 1; done
-              return 1
-            }
             _unit_active() {
               systemctl --user is-active --quiet "$UNIT.scope" 2>/dev/null
+            }
+            # Bails out as soon as the scope dies (e.g. k3s crashes on
+            # startup) instead of polling readyz for the full timeout --
+            # --collect means a dead scope disappears from `systemctl`
+            # within a second or two, so this catches a crash fast.
+            _wait_ready() {
+              seen_active=""
+              for _ in $(seq 120); do
+                _api_ready && return 0
+                if _unit_active; then
+                  seen_active=1
+                elif [ -n "$seen_active" ]; then
+                  echo "k3s: unit $UNIT.scope is no longer active -- it crashed on startup, check $DATA_DIR/k3s.log" >&2
+                  return 1
+                fi
+                sleep 1
+              done
+              return 1
             }
 
             owned=""
