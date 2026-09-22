@@ -66,18 +66,45 @@
           # properties; accounting-only flags don't count, since basic
           # cpu.stat is free without the controller.
           #
-          # Env vars to opt out:
-          #   K3S_NO_AUTOSTART=1  -- skip starting k3s entirely (manual mode)
+          # See the "Configuration" block at the top of shellHook below for
+          # the env vars you can set to change its behavior.
           shellHook = ''
-            echo "deployment shell ready -- k3s $(k3s --version | head -n1)" | lolcat
-            echo "GIT_BRANCH=$GIT_BRANCH (used by 'just up-local' as the Argo CD targetRevision)" | lolcat
+            # --- Configuration: env vars you can set before `nix develop` ---
+            #
+            #   K3S_NO_AUTOSTART=1    Skip starting k3s entirely (manual mode);
+            #                         prints the systemd-run command instead.
+            #
+            #   ZTK_STATE_DIR=<path>  Where k3s's own state (containerd overlayfs
+            #                         snapshots, kubeconfig) lives. Kept OUTSIDE
+            #                         the flake's source directory on purpose:
+            #                         `nix develop` has to copy/hash that
+            #                         directory into the Nix store, and without
+            #                         git-aware filtering (e.g. when deployment/
+            #                         is dropped onto a server as a plain
+            #                         directory, not a git clone) that's a
+            #                         literal recursive copy -- which chokes
+            #                         with "Permission denied" on containerd's
+            #                         overlayfs snapshot work dirs (mode 000,
+            #                         only readable from inside the rootless
+            #                         user namespace that created them).
+            #                         Defaults to "$XDG_STATE_HOME/zero-to-kanban-k3s".
+            #
+            #   XDG_STATE_HOME=<path> Standard XDG override, used as the parent
+            #                         of the default state dir above when
+            #                         ZTK_STATE_DIR isn't set. Falls back to
+            #                         "$HOME/.local/state" if unset.
+            K3S_NO_AUTOSTART="''${K3S_NO_AUTOSTART:-}"
+            STATE_DIR="''${ZTK_STATE_DIR:-''${XDG_STATE_HOME:-$HOME/.local/state}/zero-to-kanban-k3s}"
+            # -------------------------------------------------------------------
 
-            if [ -n "''${K3S_NO_AUTOSTART:-}" ]; then
+            echo "deployment shell ready -- k3s $(k3s --version | head -n1)" | lolcat
+
+            if [ -n "$K3S_NO_AUTOSTART" ]; then
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
               echo "in flake.nix for why plain 'k3s server --rootless ...' can fail on WSL):"
               echo "  systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
               echo "    -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
-              echo "    -- k3s server --rootless --write-kubeconfig ./k3s.yaml --write-kubeconfig-mode 644 --data-dir ./.k3s"
+              echo "    -- k3s server --rootless --write-kubeconfig $STATE_DIR/k3s.yaml --write-kubeconfig-mode 644 --data-dir $STATE_DIR/.k3s"
               return 2>/dev/null || exit 0
             fi
 
@@ -99,10 +126,11 @@
             # `main` -- lets you sync a dev branch without committing to
             # main. Falls back to "main" if HEAD is detached.
             export GIT_BRANCH="$(git -C "$DEPLOY_DIR" symbolic-ref --short -q HEAD || echo main)"
+            echo "GIT_BRANCH=$GIT_BRANCH (used by 'just up-local' as the Argo CD targetRevision)" | lolcat
 
-            KUBECONFIG_PATH="$DEPLOY_DIR/k3s.yaml"
+            KUBECONFIG_PATH="$STATE_DIR/k3s.yaml"
             export KUBECONFIG="$KUBECONFIG_PATH"
-            DATA_DIR="$DEPLOY_DIR/.k3s"
+            DATA_DIR="$STATE_DIR/.k3s"
             UNIT="zero-to-kanban-k3s"
             mkdir -p "$DATA_DIR"
 

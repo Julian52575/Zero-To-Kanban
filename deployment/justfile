@@ -7,8 +7,12 @@ default:
 unit := "zero-to-kanban-k3s"
 deploy_dir := justfile_directory()
 repo_root := parent_directory(deploy_dir)
-data_dir := deploy_dir + "/.k3s"
-kubeconfig := deploy_dir + "/k3s.yaml"
+# Kept outside deploy_dir -- see the STATE_DIR comment in flake.nix
+# shellHook for why (Nix has to copy the flake source tree, which chokes
+# on containerd's mode-000 overlayfs snapshot dirs if state lives inside).
+state_dir := env_var_or_default("ZTK_STATE_DIR", env_var_or_default("XDG_STATE_HOME", env_var("HOME") + "/.local/state") + "/zero-to-kanban-k3s")
+data_dir := state_dir + "/.k3s"
+kubeconfig := state_dir + "/k3s.yaml"
 
 export KUBECONFIG := kubeconfig
 
