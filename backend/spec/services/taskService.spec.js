@@ -6,6 +6,10 @@ jest.mock('../../src/repositories/taskRepository', () => ({
     deleteById: jest.fn(),
 }));
 
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
 const taskRepository = require('../../src/repositories/taskRepository');
 const taskService = require('../../src/services/taskService');
 

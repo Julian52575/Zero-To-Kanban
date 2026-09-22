@@ -23,3 +23,7 @@ model Project {
   @@map("projects")
 }
 
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}

@@ -56,6 +56,7 @@ async function getProject(id) {
 }
 
 module.exports = {
+    prisma,
     init,
     teardown,
     getItems,
