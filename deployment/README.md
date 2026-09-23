@@ -242,11 +242,8 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
    kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server
    ```
 
-   The UI isn't exposed publicly. From your own machine, tunnel to it with
-   `ssh -L 8081:localhost:8081 <vps>`, run
-   `kubectl -n argocd port-forward svc/argocd-server 8081:443` on the VPS,
-   then open https://localhost:8081. Log in as `admin` with the password
-   from `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`.
+   The UI isn't public. See [Reaching the internal UIs](#reaching-the-internal-uis)
+   below to open it.
 
 2. Create the prod Secrets in `ztk-prod`, before the first sync.
    `values-prod.yaml` only names them, so Argo CD never sees the values.
@@ -374,3 +371,32 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
    throwaway k3s node, and opens a PR if it becomes ready. Merge the PR, then
    sync `ztk-prod` by hand from the Argo CD UI or with
    `argocd app sync ztk-prod`.
+
+### Reaching the internal UIs
+
+Only the app itself is public (Traefik on ports 80/443). Argo CD, the
+RabbitMQ management UI and the databases are reachable only from inside the
+cluster. Open them with `kubectl port-forward`, from any machine whose
+`kubectl` can reach the cluster:
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8081:443 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-zero-to-kanban-rabbitmq 15672:15672 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-postgresql 15432:5432 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-authdb 15433:5432 &
+wait   # Ctrl+C stops them all
+```
+
+Start only the ones you need. The NetworkPolicies don't block
+`kubectl port-forward`.
+
+| What                  | Local port | URL / client                        | Login |
+|-----------------------|------------|-------------------------------------|-------|
+| Argo CD               | 8081       | https://localhost:8081 (self-signed, accept the warning) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
+| RabbitMQ management   | 15672      | http://localhost:15672              | `user` / `password` key of `zero-to-kanban-prod-rabbitmq` |
+| app DB (`postgresql`) | 15432      | `psql -h localhost -p 15432 -U todo todo` | `password` key of `zero-to-kanban-prod-postgresql` |
+| auth DB (`authdb`)    | 15433      | `psql -h localhost -p 15433 -U authuser auth` | `password` key of `zero-to-kanban-prod-authdb` |
+
+The Secret keys are read back as in step 2, e.g.
+`kubectl -n ztk-prod get secret zero-to-kanban-prod-rabbitmq -o jsonpath='{.data.password}' | base64 -d; echo`.
+Use the `postgres` user and the `postgres-password` key for admin work.
