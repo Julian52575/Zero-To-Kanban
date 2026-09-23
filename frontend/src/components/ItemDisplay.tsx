@@ -30,12 +30,9 @@ function ItemDisplay({
                 setError(getErrorMessage(error));
             });
     };
+    
     const removeItem = () => {
-        fetch(`/api/items/${item.id}`, {
-            method: 'DELETE',
-        }).then(() => onItemRemoval(item));
         setError(null);
-
         deleteItem(item.id)
             .then(() => onItemRemoval(item))
             .catch(error => {
