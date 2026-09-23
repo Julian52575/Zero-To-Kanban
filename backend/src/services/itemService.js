@@ -19,14 +19,23 @@ async function createItem(data) {
         name: data.name,
         completed: false,
     };
-    await publishEvent(EVENTS.TASK_CREATED, item);
-
-    return itemRepository.create(item);
+    const createdItem = await itemRepository.create(item);
+    try {
+        await publishEvent(EVENTS.TASK_CREATED, createdItem);
+    } catch (error) {
+        console.error('Failed to publish TASK_CREATED event:', error);
+    }
+    return createdItem;
 }
+
 
 async function deleteItem(id) {
     const rep = itemRepository.deleteById(id);
-    await publishEvent(EVENTS.TASK_DELETED, { id });
+    try {
+        await publishEvent(EVENTS.TASK_DELETED, { id });
+    } catch (error) {
+        console.error('Failed to publish TASK_DELETED event:', error);
+    }
     return rep;
 }
 
@@ -38,7 +47,11 @@ async function updateItem(id, data) {
 
     await itemRepository.updateById(id, item);
 
-    await publishEvent(EVENTS.TASK_UPDATED, { id, ...item });
+    try {
+        await publishEvent(EVENTS.TASK_UPDATED, { id, ...item });
+    } catch (error) {
+        console.error('Failed to publish TASK_UPDATED event:', error);
+    }
 
     return itemRepository.getById(id);
 }

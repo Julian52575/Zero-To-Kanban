@@ -4,8 +4,11 @@ const { publishEvent } = require("../events/eventBus");
 
 async function createProject(req, res) {
     const project = await projectService.createProject(req.body);
-
-    publishEvent(EVENTS.PROJECT_CREATED, project);
+    try {
+        await publishEvent(EVENTS.PROJECT_CREATED, project);
+    } catch (error) {
+        console.error('Failed to publish PROJECT_CREATED event:', error);
+    }
 
     res.status(201).json(project);
 }
@@ -33,7 +36,11 @@ async function updateProject(req, res) {
         req.body
     );
 
-    publishEvent(EVENTS.PROJECT_UPDATED, project);
+    try {
+        await publishEvent(EVENTS.PROJECT_UPDATED, project);
+    } catch (error) {
+        console.error('Failed to publish PROJECT_UPDATED event:', error);
+    }
 
     res.json(project);
 }
@@ -41,9 +48,20 @@ async function updateProject(req, res) {
 async function deleteProject(req, res) {
     await projectService.deleteProject(req.params.id);
 
-    publishEvent(EVENTS.PROJECT_DELETED, { id: req.params.id });
+    try {
+        await publishEvent(EVENTS.PROJECT_DELETED, { id: req.params.id });
+    } catch (error) {
+        console.error('Failed to publish PROJECT_DELETED event:', error);
+    }
 
     res.status(200).end();
+}
+
+async function getProjectsTasks(req, res) {
+    const tasks = await projectService.getProjectsTasks(req.params.id);
+
+    res.json(tasks);
+    
 }
 
 module.exports = {
@@ -52,4 +70,5 @@ module.exports = {
     createProject,
     updateProject,
     deleteProject,
+    getProjectsTasks,
 };

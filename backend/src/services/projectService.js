@@ -35,7 +35,16 @@ async function deleteProject(id) {
         throw new Error('Project not found');
     }
 
-    return projectRepository.delete(id);
+    return projectRepository.deleteProject(id);
+}
+
+async function getProjectsTasks(projectId) {
+    const project = await projectRepository.getById(projectId);
+    if (!project) {
+        throw new Error('Project not found');
+    }
+
+    return projectRepository.getTasksByProjectId(projectId);
 }
 
 module.exports = {
@@ -44,4 +53,5 @@ module.exports = {
     getProject,
     updateProject,
     deleteProject,
+    getProjectsTasks,
 };

@@ -1,14 +1,24 @@
 .kanban-board {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(280px, 360px));
+    justify-content: center;
+    gap: 1.25rem;
     align-items: start;
-    margin-top: 1.5rem;
+    margin: 1.5rem auto 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1000px) {
     .kanban-board {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(280px, 360px));
+    }
+}
+
+@media (max-width: 650px) {
+    .kanban-board {
+        grid-template-columns: minmax(280px, 1fr);
+        padding: 0 1rem;
     }
 }
 
@@ -18,12 +28,22 @@
     border-top: 4px solid #adb5bd;
     padding: 0.75rem;
     min-height: 12rem;
+    width: 100%;
+    box-sizing: border-box;
     transition: background-color 0.15s;
 }
 
-.kanban-column-todo  { border-top-color: #6c757d; }
-.kanban-column-doing { border-top-color: #0d6efd; }
-.kanban-column-done  { border-top-color: #198754; }
+.kanban-column-todo {
+    border-top-color: #6c757d;
+}
+
+.kanban-column-doing {
+    border-top-color: #0d6efd;
+}
+
+.kanban-column-done {
+    border-top-color: #198754;
+}
 
 .kanban-column.is-over {
     background: #e2e8f0;
@@ -69,6 +89,8 @@
     border: 1px solid #dee2e6;
     border-radius: 0.4rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .kanban-card.is-dragging {
@@ -82,13 +104,39 @@
 }
 
 .kanban-handle {
+    position: relative;
     background: none;
     border: 0;
     border-right: 1px solid #e9ecef;
     color: #868e96;
     cursor: grab;
     padding: 0 0.6rem;
-    touch-action: none; /* indispensable pour le drag au doigt */
+    touch-action: none;
+}
+
+.kanban-handle::after {
+    content: "Swipe to move";
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 0.35rem);
+    transform: translateX(-50%) translateY(-0.25rem);
+    background: rgba(33, 37, 41, 0.9);
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 1;
+}
+
+.kanban-handle:hover::after,
+.kanban-handle:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .kanban-handle:hover,
@@ -99,6 +147,43 @@
 .kanban-card-body {
     flex: 1;
     min-width: 0;
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
     word-break: break-word;
+}
+
+.fa-trash {
+    position: relative;
+    color: #e74c3c;
+    cursor: pointer;
+    transition: color 0.2s ease-in-out;
+}
+
+.fa-trash::after {
+    content: "delete";
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 0.35rem);
+    transform: translateX(-50%) translateY(-0.25rem);
+    background: rgba(33, 37, 41, 0.9);
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 1;
+}
+
+.fa-trash:hover::after,
+.fa-trash:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.fa-trash:hover,
+.fa-trash:focus-visible {
+    color: #c0392b;
 }

@@ -11,6 +11,7 @@ const getProject = require('./routes/project/getProject');
 const createProject = require('./routes/project/createProject');
 const updateProject = require('./routes/project/updateProject');
 const deleteProject = require('./routes/project/deleteProject');
+const getProjectTasks = require('./routes/project/getProjectTasks');
 
 const {
     validateCreateProject,
@@ -22,7 +23,6 @@ app.disable('x-powered-by');
 app.use(express.json());
 
 const apiRouter = express.Router();
-
 
 apiRouter.get('/items', getItems);
 apiRouter.get('/items/:id', getItem);
@@ -41,6 +41,7 @@ apiRouter.post('/projects', validateCreateProject, createProject);
 apiRouter.delete('/projects/:id', deleteProject);
 apiRouter.put('/projects/:id', updateProject);
 apiRouter.patch('/projects/:id', updateProject);
+apiRouter.get('/projects/:id/tasks', getProjectTasks);
 
 app.use(apiRouter);
 
