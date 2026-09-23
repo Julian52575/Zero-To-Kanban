@@ -1,5 +1,6 @@
-# Overrides for the dev environment. Used by the Argo CD Application in
-# deployment/argocd/environments/dev-app.yaml.
+# Overrides for the dev environment. Used by the Argo CD Applications in
+# deployment/argocd/environments/dev-app.yaml, dev-k3s-app.yaml and
+# dev-k3s-local-app.yaml.
 
 backend:
   image:

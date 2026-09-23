@@ -2,9 +2,6 @@
 # discover/manage the per-environment child Applications in ./environments.
 #
 #   kubectl apply -n argocd -f deployment/argocd/root-app.yaml
-#
-# Update `spec.source.repoURL` to this repo's actual git remote before
-# applying.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
