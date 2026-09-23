@@ -5,6 +5,8 @@ default:
     @just --list
 
 unit := "zero-to-kanban-k3s"
+traefik_pf_unit := "zero-to-kanban-traefik-pf"
+argocd_pf_unit := "zero-to-kanban-argocd-ui-pf"
 deploy_dir := justfile_directory()
 repo_root := parent_directory(deploy_dir)
 # Kept outside deploy_dir -- see the STATE_DIR comment in flake.nix
@@ -17,7 +19,7 @@ kubeconfig := state_dir + "/k3s.yaml"
 export KUBECONFIG := kubeconfig
 
 # Bootstrap Argo CD syncing from your LOCAL working tree -- commits land without a push
-up-local: _k3s-ready _argocd-base
+up-local: _k3s-ready _argocd-base _bind-traefik _bind-argocd-ui
     #!/usr/bin/env bash
     set -euo pipefail
     branch="{{env_var_or_default("GIT_BRANCH", "main")}}"
@@ -41,7 +43,7 @@ up-local: _k3s-ready _argocd-base
     just _argocd-info
 
 # Bootstrap Argo CD syncing from git -- the normal GitOps flow: commit + push to pick up edits
-up-gitops: _k3s-ready _argocd-base
+up-gitops: _k3s-ready _argocd-base _bind-traefik _bind-argocd-ui
     kubectl apply -n argocd -f "{{deploy_dir}}/argocd/environments/dev-k3s-app.yaml"
     @echo "argocd: ztk-dev-k3s applied -- syncing from git (main), NOT your local working tree"
     @echo "  -> local edits need a commit+push before Argo CD picks them up; 'just refresh-gitops' to sync immediately"
@@ -81,11 +83,43 @@ _argocd-base:
           || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
     fi
 
+# (internal) background port-forward: Traefik's web entrypoint -> localhost:18080.
+# Same setsid+systemd-run --scope --collect pattern as k3s itself in
+# flake.nix's shellHook -- detaches from this recipe's process so the
+# forward outlives `just up-local` returning, and --collect + an
+# is-active check make repeat runs a no-op instead of stacking forwards.
+_bind-traefik:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if systemctl --user is-active --quiet "{{traefik_pf_unit}}.scope" 2>/dev/null; then
+        echo "traefik: already bound to localhost:18080 ({{traefik_pf_unit}}.scope)"
+    else
+        echo "traefik: binding svc/traefik :80 -> localhost:18080 ({{traefik_pf_unit}}.scope)"
+        setsid systemd-run --user --unit="{{traefik_pf_unit}}" --scope --collect \
+          -- kubectl -n kube-system port-forward svc/traefik 18080:80 \
+          >"{{state_dir}}/traefik-portforward.log" 2>&1 &
+        disown 2>/dev/null || true
+    fi
+
+# (internal) background port-forward: Argo CD UI -> localhost:18081 (https)
+_bind-argocd-ui:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if systemctl --user is-active --quiet "{{argocd_pf_unit}}.scope" 2>/dev/null; then
+        echo "argocd: UI already bound to localhost:18081 ({{argocd_pf_unit}}.scope)"
+    else
+        echo "argocd: binding svc/argocd-server :443 -> localhost:18081 ({{argocd_pf_unit}}.scope)"
+        setsid systemd-run --user --unit="{{argocd_pf_unit}}" --scope --collect \
+          -- kubectl -n argocd port-forward svc/argocd-server 18081:443 \
+          >"{{state_dir}}/argocd-ui-portforward.log" 2>&1 &
+        disown 2>/dev/null || true
+    fi
+
 # (internal) print UI/password hints
 _argocd-info:
     @echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n" | lolcat
-    @echo "argocd UI: kubectl -n argocd port-forward svc/argocd-server 8081:443" | lolcat
-    @echo "bind traefik: kubectl -n kube-system port-forward svc/traefik 8080:80"  | lolcat
+    @echo "argocd UI: https://localhost:18081 (auto-bound; self-signed cert)" | lolcat
+    @echo "traefik: http://localhost:18080 (auto-bound)" | lolcat
 
 # Remove Argo CD (and everything it manages) from the cluster; the k3s node keeps running
 rm: _k3s-ready
@@ -103,18 +137,24 @@ rm: _k3s-ready
       --ignore-not-found --wait --timeout=120s
     kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --ignore-not-found
     kubectl delete namespace argocd --ignore-not-found
+    if systemctl --user is-active --quiet "{{argocd_pf_unit}}.scope" 2>/dev/null; then
+        echo "+ systemctl --user stop {{argocd_pf_unit}}.scope (argocd-server is gone, forward would just error)"
+        systemctl --user stop "{{argocd_pf_unit}}.scope"
+    fi
     echo "argocd: removed from the cluster -- 'just up-local'/'just up-gitops' to reinstall"
 
 # Stop the rootless k3s node and delete all its state (Argo CD, Postgres data, everything)
 nuke:
     #!/usr/bin/env bash
     set -euo pipefail
-    if systemctl --user is-active --quiet "{{unit}}.scope" 2>/dev/null; then
-        echo "+ systemctl --user stop {{unit}}.scope"
-        systemctl --user stop "{{unit}}.scope"
-    else
-        echo "k3s: {{unit}}.scope not active, nothing to stop"
-    fi
+    for u in "{{unit}}" "{{traefik_pf_unit}}" "{{argocd_pf_unit}}"; do
+        if systemctl --user is-active --quiet "$u.scope" 2>/dev/null; then
+            echo "+ systemctl --user stop $u.scope"
+            systemctl --user stop "$u.scope"
+        else
+            echo "$u.scope not active, nothing to stop"
+        fi
+    done
     if [ -d "{{data_dir}}" ]; then
         echo "+ rootlesskit rm -rf {{data_dir}}"
         # containerd's overlayfs snapshots are owned by uids remapped
