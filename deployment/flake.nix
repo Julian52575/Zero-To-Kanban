@@ -65,15 +65,6 @@
           # properties; accounting-only flags don't count, since basic
           # cpu.stat is free without the controller.
           #
-          # --disable-network-policy: k3s's embedded NetworkPolicy controller
-          # can't run here. Under rootless k3s on WSL2, its iptables-restore
-          # fails with "Message too long" once the rule set grows, whether it
-          # uses the nixpkgs or the bundled iptables. It then enforces an
-          # arbitrary subset of the policies (e.g. the chart's default-deny
-          # but not its allow rules), which randomly blocks pods. Local
-          # clusters therefore enforce no NetworkPolicies at all; the chart's
-          # policies still apply on real clusters.
-          #
           # See the "Configuration" block at the top of shellHook below for
           # the env vars you can set to change its behavior.
           shellHook = ''
@@ -112,7 +103,7 @@
               echo "in flake.nix for why plain 'k3s server --rootless ...' can fail on WSL):"
               echo "  setsid systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
               echo "    -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
-              echo "    -- k3s server --rootless --disable-network-policy --write-kubeconfig $STATE_DIR/k3s.yaml --write-kubeconfig-mode 644 --data-dir $STATE_DIR/.k3s"
+              echo "    -- k3s server --rootless --write-kubeconfig $STATE_DIR/k3s.yaml --write-kubeconfig-mode 644 --data-dir $STATE_DIR/.k3s"
               return 2>/dev/null || exit 0
             fi
 
@@ -173,12 +164,12 @@
             else
               echo "k3s: starting rootless node (first boot can take a minute)..."
               CPU_RANGE="0-$(( $(nproc) - 1 ))"
-              echo "+ setsid systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --disable-network-policy --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)"
+              echo "+ setsid systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)"
               # setsid: puts systemd-run (and the k3s it execs into via
               # --scope) in its own session, detached from this terminal.
               setsid systemd-run --user --unit="$UNIT" --scope --collect \
                 -p Delegate=yes -p CPUWeight=100 -p "AllowedCPUs=$CPU_RANGE" -p IOWeight=100 \
-                -- k3s server --rootless --disable-network-policy \
+                -- k3s server --rootless \
                      --write-kubeconfig "$KUBECONFIG_PATH" --write-kubeconfig-mode 644 \
                      --data-dir "$DATA_DIR" \
                 >"$DATA_DIR/k3s.log" 2>&1 &
