@@ -20,11 +20,12 @@ spec:
     path: deployment/argocd/environments
     directory:
       recurse: false
-      # dev-k3s-app.yaml and monitoring-k3s-app.yaml are for standalone
-      # local k3s use only (see their own comments) -- exclude them so a
+      # The *-k3s* Applications are for standalone local k3s use only (see
+      # their own comments; dev-k3s-local-app.yaml is a template that
+      # `just up-local` fills in) -- exclude them so a
       # shared/real root-app sync never spawns them pointed at the wrong
       # cluster.
-      exclude: "{dev-k3s-app.yaml,monitoring-k3s-app.yaml}"
+      exclude: "{dev-k3s-app.yaml,monitoring-k3s-app.yaml,dev-k3s-local-app.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
