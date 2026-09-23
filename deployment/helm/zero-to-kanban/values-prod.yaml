@@ -53,6 +53,14 @@ frontend:
 ingress:
   entryPoints:
     - websecure
+  # values.yaml default-enables /metrics for local/dev testing, where the
+  # entrypoint isn't internet-reachable. Here it would be -- Traefik's
+  # metrics aren't secret, but they're unauthenticated and disclose router
+  # topology/error rates, so keep them off until scraped some other way
+  # (e.g. a Prometheus in-cluster hitting the entrypoint directly, or this
+  # route behind an IP-allowlist/auth middleware).
+  metrics:
+    enabled: false
   tls:
     enabled: true
     secretName: kanban-tls

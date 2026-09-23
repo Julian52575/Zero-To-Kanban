@@ -46,6 +46,17 @@ spec:
       services:
         - name: {{ include "zero-to-kanban.fullname" . }}-frontend
           port: 3000
+    {{- if .Values.ingress.metrics.enabled }}
+    # Traefik's own Prometheus metrics, via its built-in internal service --
+    # not one of ours, so no port/namespace to set. Priority just needs to
+    # beat the `/` catch-all above; it can't collide with /auth or /items.
+    - match: PathPrefix(`{{ .Values.ingress.metrics.path }}`)
+      kind: Rule
+      priority: 50
+      services:
+        - name: prometheus@internal
+          kind: TraefikService
+    {{- end }}
   {{- if .Values.ingress.tls.enabled }}
   tls:
     secretName: {{ .Values.ingress.tls.secretName }}

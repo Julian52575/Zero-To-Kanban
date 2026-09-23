@@ -66,6 +66,15 @@ ingress:
   # dev-mode Traefik proxy in docker-compose.yml listens on).
   entryPoints:
     - web
+  # Routes Traefik's own Prometheus metrics (router/service request counts
+  # and latency histograms -- infra metrics, no application data) through
+  # the same IngressRoute/entryPoints as the app, via Traefik's built-in
+  # `prometheus@internal` service -- no extra Traefik config needed, it's
+  # already scraping-ready. Unauthenticated: fine on a private/dev
+  # entrypoint, but see values-prod.yaml before exposing it publicly.
+  metrics:
+    enabled: true
+    path: /metrics
   tls:
     enabled: false
     secretName: ""
