@@ -23,6 +23,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        {{- include "zero-to-kanban.waitFor" (dict "name" "backend" "host" (printf "%s-backend" (include "zero-to-kanban.fullname" .)) "port" 3000 "image" .Values.frontend.image) | nindent 8 }}
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"

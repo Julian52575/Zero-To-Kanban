@@ -104,6 +104,15 @@ The shell exports `KUBECONFIG` (pointing into the state dir) and `GIT_BRANCH`
 Both Postgres instances come from the Bitnami `postgresql` chart. Services
 run their own migrations on startup.
 
+**Startup order:** each pod has a `wait-for-*` init container that holds it
+until the Service it depends on accepts connections. A Service only routes
+to ready pods, so this waits for the dependency's readiness probe to pass:
+
+```
+postgresql ──▶ backend ──▶ frontend
+authdb     ──▶ auth
+```
+
 **Routing** is done by a Traefik `IngressRoute` that matches on path only,
 with no hostname. It is the same routing as `docker-compose.yml`:
 

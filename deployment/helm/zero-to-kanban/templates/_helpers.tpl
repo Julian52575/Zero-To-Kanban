@@ -71,3 +71,24 @@ Name of the Secret holding the Postgres password.
 {{- define "zero-to-kanban.metricsAuth.secretKey" -}}
 {{- .Values.ingress.metrics.auth.existingSecretKey | default "users" -}}
 {{- end -}}
+
+{{/*
+Init container that blocks until a Service accepts TCP connections. A
+ClusterIP Service only routes to Ready pods, so this really waits for the
+dependency's readinessProbe to pass, not just for its pod to exist. Runs in
+the calling component's own image (all node-based) -- no extra image pull.
+Usage: include "zero-to-kanban.waitFor" (dict "name" "db" "host" "..." "port" 5432 "image" .Values.backend.image)
+*/}}
+{{- define "zero-to-kanban.waitFor" -}}
+- name: wait-for-{{ .name }}
+  image: "{{ .image.repository }}:{{ .image.tag }}"
+  imagePullPolicy: {{ .image.pullPolicy }}
+  command:
+    - sh
+    - -c
+    - |
+      until node -e "require('net').connect({{ .port }}, '{{ .host }}').on('connect', () => process.exit(0)).on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 2000)"; do
+        echo "waiting for {{ .host }}:{{ .port }} to be ready..."
+        sleep 2
+      done
+{{- end -}}
