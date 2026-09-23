@@ -4,26 +4,31 @@ async function create(project) {
     return db.createProject(project);
 }
 
-async function getAll() {
-    return db.getProjects();
+async function getAll(userId) {
+    return db.getProjects(userId);
 }
 
 async function getById(id) {
     return db.getProject(id);
 }
 
-async function getTasksByProjectId(projectId) {
-    return db.getTasksByProjectId(projectId);
-}
-
 async function deleteProject(id) {
     return db.deleteProject(id);
+}
+
+async function getColumnsByProject(projectId) {
+  return db.getColumns(projectId);
+}
+
+async function userCanAccessProject(userId, projectId) {
+  return db.userCanAccessProject(userId, projectId);
 }
 
 module.exports = {
     create,
     getAll,
     getById,
-    getTasksByProjectId,
     deleteProject,
+    getColumnsByProject,
+    userCanAccessProject,
 };

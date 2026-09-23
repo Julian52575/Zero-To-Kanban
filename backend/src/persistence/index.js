@@ -2,6 +2,12 @@ const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
+const DEFAULT_COLUMNS = [
+  { name: "À faire", order: 0 },
+  { name: "En cours", order: 1 },
+  { name: "Terminé", order: 2 },
+];
+
 async function init() {
   await prisma.$connect();
   console.log("Connected to database via Prisma");
@@ -36,42 +42,130 @@ async function removeItem(id) {
   await prisma.todoItem.delete({ where: { id } });
 }
 
+async function userCanAccessProject(userId, projectId) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, ownerId: userId },
+    select: { id: true },
+  });
+  return project !== null;
+}
+
+async function columnBelongsToProject(columnId, projectId) {
+  const column = await prisma.column.findFirst({
+    where: { id: columnId, projectId },
+    select: { id: true },
+  });
+  return column !== null;
+}
+
+async function getColumns(projectId) {
+  return prisma.column.findMany({
+    where: { projectId },
+    orderBy: { order: "asc" },
+  });
+}
+
+
+async function getTasks(projectId) {
+  return prisma.task.findMany({
+    where: { column: { projectId } },
+    orderBy: [{ columnId: "asc" }, { order: "asc" }],
+  });
+}
+
+async function getTask(id) {
+  return prisma.task.findUnique({
+    where: { id },
+    include: { column: true },
+  });
+}
+
+async function storeTask(columnId, creatorId, taskData) {
+  const taskCount = await prisma.task.count({ where: { columnId } });
+
+  return prisma.task.create({
+    data: {
+      title: taskData.title,
+      description: taskData.description,
+      order: taskCount,
+      columnId,
+      creatorId,
+      assigneeId: taskData.assigneeId || null,
+    },
+  });
+}
+
+async function updateTask(id, updateData) {
+  return prisma.task.update({
+    where: { id },
+    data: {
+      title: updateData.title,
+      description: updateData.description,
+      order: updateData.order,
+      columnId: updateData.columnId,
+      assigneeId: updateData.assigneeId,
+    },
+  });
+}
+
+async function deleteTask(id) {
+  return prisma.task.delete({ where: { id } });
+}
+
 async function createProject(project) {
   return prisma.project.create({
     data: {
       id: project.id,
       name: project.name,
+      ownerId: project.ownerId,
+      columns: { create: DEFAULT_COLUMNS },
     },
+    include: { columns: { orderBy: { order: "asc" } } },
   });
 }
 
-async function getProjects() {
-  return prisma.project.findMany();
+async function getProjects(userId) {
+  if (!userId) throw new Error("getProjects: userId is required");
+  return prisma.project.findMany({
+    where: { ownerId: userId },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 async function getProject(id) {
-  return prisma.project.findUnique({
-    where: { id },
-  });
+  return prisma.project.findUnique({ where: { id } });
 }
 
 async function deleteProject(id) {
-  return prisma.project.delete({
-    where: { id },
-  });
+  return prisma.project.delete({ where: { id } });
 }
 
+
 module.exports = {
-  prisma,
   init,
   teardown,
+
   getItems,
   getItem,
   storeItem,
   updateItem,
   removeItem,
+
+  userCanAccessProject,
+  columnBelongsToProject,
+
+  getColumns,
+
+  getTasks,
+  getTask,
+  storeTask,
+  updateTask,
+  deleteTask,
+
   createProject,
   getProjects,
   getProject,
   deleteProject,
+
+  prisma,
 };

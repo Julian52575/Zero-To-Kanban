@@ -1,95 +1,66 @@
-import React from 'react';
-import { Container, Row, Col, Button } from 'react-bootstrap';
-import type { Item } from '../types/item';
-import {
-    updateItem,
-    deleteItem,
-} from '../services/itemsApi';
-import { getErrorMessage } from '../utils/errorMessage';
+import React from "react";
+import { Button, Form, InputGroup } from "react-bootstrap";
+import type { Item } from "../types/item";
 
-interface ItemDisplayProps {
-    item: Item;
-    onItemUpdate: (item: Item) => void;
-    onItemRemoval: (item: Item) => void;
+interface Props {
+  item: Item;
+  onRename: (item: Item, name: string) => void;
+  onDelete: (item: Item) => void;
 }
-function ItemDisplay({
-    item,
-    onItemUpdate,
-    onItemRemoval,
-}: ItemDisplayProps) {
-    const [error, setError] = React.useState<string | null>(null);
-    const toggleCompletion = () => {
-        setError(null);
-        updateItem({
-            ...item,
-            completed: !item.completed,
-        })
-            .then(updatedItem => onItemUpdate(updatedItem))
-            .catch(error => {
-                console.error(error);
-                setError(getErrorMessage(error));
-            });
-    };
-    
-    const removeItem = () => {
-        setError(null);
-        deleteItem(item.id)
-            .then(() => onItemRemoval(item))
-            .catch(error => {
-                console.error(error);
-                setError(getErrorMessage(error));
-            });
-    };
+
+function ItemDisplay({ item, onRename, onDelete }: Props) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(item.name);
+
+  const startEditing = () => {
+    setDraft(item.name);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setDraft(item.name);
+    setEditing(false);
+  };
+
+  const save = () => {
+    setEditing(false);
+    onRename(item, draft);
+  };
+
+  if (editing) {
     return (
-        <Container
-            fluid
-            className={`item ${item.completed ? 'completed' : ''}`}
-        >
-            {error && (
-                <Row>
-                    <Col className="text-danger">
-                        {error}
-                    </Col>
-                </Row>
-            )}
-            <Row>
-                <Col xs={1} className="text-center">
-                    <Button
-                        className="toggles"
-                        size="sm"
-                        variant="link"
-                        onClick={toggleCompletion}
-                        aria-label={
-                            item.completed
-                                ? 'Mark item as incomplete'
-                                : 'Mark item as complete'
-                        }
-                    >
-                        <i
-                            className={`far ${
-                                item.completed
-                                    ? 'fa-check-square'
-                                    : 'fa-square'
-                            }`}
-                        />
-                    </Button>
-                </Col>
-                <Col xs={10} className="name">
-                    {item.name}
-                </Col>
-                <Col xs={1} className="text-center remove">
-                    <Button
-                        size="sm"
-                        variant="link"
-                        onClick={removeItem}
-                        aria-label="Remove Item"
-                    >
-                        <i className="fa fa-trash text-danger" />
-                    </Button>
-                </Col>
-            </Row>
-        </Container>
+      <InputGroup size="sm">
+        <Form.Control
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") cancel();
+          }}
+        />
+        <Button variant="success" onClick={save}>
+          OK
+        </Button>
+      </InputGroup>
     );
+  }
+
+  return (
+    <div className="d-flex justify-content-between align-items-center gap-2">
+      <span onDoubleClick={startEditing} title="Double-clic pour renommer">
+        {item.name}
+      </span>
+      <Button
+        size="sm"
+        variant="outline-danger"
+        aria-label={`Supprimer "${item.name}"`}
+        onClick={() => onDelete(item)}
+      >
+        ×
+      </Button>
+    </div>
+  );
 }
 
 export default ItemDisplay;

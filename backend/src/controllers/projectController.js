@@ -3,7 +3,10 @@ const { EVENTS } = require("../events/events");
 const { publishEvent } = require("../events/eventBus");
 
 async function createProject(req, res) {
-    const project = await projectService.createProject(req.body);
+    const project = await projectService.createProject({
+        name: req.body.name,
+        ownerId : req.userId
+    });
     try {
         await publishEvent(EVENTS.PROJECT_CREATED, project);
     } catch (error) {
@@ -14,7 +17,7 @@ async function createProject(req, res) {
 }
 
 async function getProjects(req, res) {
-    const projects = await projectService.getProjects();
+    const projects = await projectService.getProjects(req.userId);
 
     res.json(projects);
 }
@@ -57,18 +60,10 @@ async function deleteProject(req, res) {
     res.status(200).end();
 }
 
-async function getProjectsTasks(req, res) {
-    const tasks = await projectService.getProjectsTasks(req.params.id);
-
-    res.json(tasks);
-    
-}
-
 module.exports = {
     getProjects,
     getProject,
     createProject,
     updateProject,
     deleteProject,
-    getProjectsTasks,
 };

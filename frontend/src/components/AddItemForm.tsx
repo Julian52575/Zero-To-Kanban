@@ -1,24 +1,35 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
-import { createItem } from '../services/itemsApi';
 import type { Item } from '../types/item';
 import { getErrorMessage } from '../utils/errorMessage';
+import { createTask } from '../services/taskService';
 
 interface AddItemFormProps {
+    projectId: string;
     onNewItem: (item: Item) => void;
+    columnId?: string; // Optional columnId prop
 }
 
-function AddItemForm({ onNewItem }: AddItemFormProps) {
+function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
     const [newItem, setNewItem] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+
+
     const submitNewItem = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!columnId) return;
+
         setSubmitting(true);
         setError(null);
-        createItem(newItem)
+        createTask(projectId, { title: newItem.trim(), columnId })
             .then(item => {
-                onNewItem(item);
+                onNewItem({
+                    id: item.id,
+                    name: item.title,
+                    completed: false,
+                    status: 'todo',
+                });
                 setNewItem('');
             })
             .catch(error => {
