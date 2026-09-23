@@ -4,10 +4,22 @@ set shell := ["bash", "-eu", "-c"]
 default:
     @just --list
 
-unit := "zero-to-kanban-k3s"
+k3s_unit := "zero-to-kanban-k3s"
+
+# Local ports auto-bound by up-local/up-gitops (see the _bind-* recipes
+# below) and the systemd --user scope name backing each one's background
+# port-forward. Named here once so a port change can't drift out of sync
+# with what _argocd-info prints.
+traefik_port := "18080"
 traefik_pf_unit := "zero-to-kanban-traefik-pf"
+argocd_ui_port := "18081"
 argocd_pf_unit := "zero-to-kanban-argocd-ui-pf"
+alertmanager_port := "18082"
 alertmanager_pf_unit := "zero-to-kanban-alertmanager-pf"
+# Argo CD's Helm release name defaults to the Application's own name --
+# see argocd/environments/monitoring-k3s-app.yaml's metadata.name.
+alertmanager_svc := "ztk-monitoring-k3s-alertmanager"
+
 deploy_dir := justfile_directory()
 repo_root := parent_directory(deploy_dir)
 # Kept outside deploy_dir -- see the STATE_DIR comment in flake.nix
@@ -84,68 +96,54 @@ _argocd-base:
           || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
     fi
 
-# (internal) background port-forward: Traefik's web entrypoint -> localhost:18080.
+# (internal) background port-forward, shared by the _bind-* recipes below.
 # Same setsid+systemd-run --scope --collect pattern as k3s itself in
-# flake.nix's shellHook -- detaches from this recipe's process so the
-# forward outlives `just up-local` returning, and --collect + an
-# is-active check make repeat runs a no-op instead of stacking forwards.
+# flake.nix's shellHook -- detaches from the calling recipe's process so
+# the forward outlives it returning, and --collect + an is-active check
+# make repeat calls a no-op instead of stacking forwards.
+_bind label unit namespace service local_port remote_port:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if systemctl --user is-active --quiet "{{unit}}.scope" 2>/dev/null; then
+        echo "{{label}}: already bound to localhost:{{local_port}} ({{unit}}.scope)"
+    else
+        echo "{{label}}: binding svc/{{service}} :{{remote_port}} -> localhost:{{local_port}} ({{unit}}.scope)"
+        setsid systemd-run --user --unit="{{unit}}" --scope --collect \
+          -- kubectl -n {{namespace}} port-forward svc/{{service}} {{local_port}}:{{remote_port}} \
+          >"{{state_dir}}/{{label}}-portforward.log" 2>&1 &
+        disown 2>/dev/null || true
+    fi
+
+# (internal) background port-forward: Traefik's web entrypoint -> localhost
 _bind-traefik:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if systemctl --user is-active --quiet "{{traefik_pf_unit}}.scope" 2>/dev/null; then
-        echo "traefik: already bound to localhost:18080 ({{traefik_pf_unit}}.scope)"
-    else
-        echo "traefik: binding svc/traefik :80 -> localhost:18080 ({{traefik_pf_unit}}.scope)"
-        setsid systemd-run --user --unit="{{traefik_pf_unit}}" --scope --collect \
-          -- kubectl -n kube-system port-forward svc/traefik 18080:80 \
-          >"{{state_dir}}/traefik-portforward.log" 2>&1 &
-        disown 2>/dev/null || true
-    fi
+    @just _bind traefik {{traefik_pf_unit}} kube-system traefik {{traefik_port}} 80
 
-# (internal) background port-forward: Argo CD UI -> localhost:18081 (https)
+# (internal) background port-forward: Argo CD UI -> localhost (https)
 _bind-argocd-ui:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if systemctl --user is-active --quiet "{{argocd_pf_unit}}.scope" 2>/dev/null; then
-        echo "argocd: UI already bound to localhost:18081 ({{argocd_pf_unit}}.scope)"
-    else
-        echo "argocd: binding svc/argocd-server :443 -> localhost:18081 ({{argocd_pf_unit}}.scope)"
-        setsid systemd-run --user --unit="{{argocd_pf_unit}}" --scope --collect \
-          -- kubectl -n argocd port-forward svc/argocd-server 18081:443 \
-          >"{{state_dir}}/argocd-ui-portforward.log" 2>&1 &
-        disown 2>/dev/null || true
-    fi
+    @just _bind argocd-ui {{argocd_pf_unit}} argocd argocd-server {{argocd_ui_port}} 443
 
-# (internal) background port-forward: Alertmanager UI -> localhost:18082.
+# (internal) background port-forward: Alertmanager UI -> localhost.
 # The monitoring stack (argocd/environments/monitoring-k3s-app.yaml) is
 # optional and applied separately from up-local/up-gitops -- skip quietly
 # instead of erroring when it isn't installed yet.
 _bind-alertmanager-ui:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! kubectl -n monitoring get svc ztk-monitoring-k3s-alertmanager >/dev/null 2>&1; then
+    if ! kubectl -n monitoring get svc {{alertmanager_svc}} >/dev/null 2>&1; then
         echo "alertmanager: monitoring stack not installed, skipping bind (see argocd/environments/monitoring-k3s-app.yaml)"
         exit 0
     fi
-    if systemctl --user is-active --quiet "{{alertmanager_pf_unit}}.scope" 2>/dev/null; then
-        echo "alertmanager: UI already bound to localhost:18082 ({{alertmanager_pf_unit}}.scope)"
-    else
-        echo "alertmanager: binding svc/alertmanager :9093 -> localhost:18082 ({{alertmanager_pf_unit}}.scope)"
-        setsid systemd-run --user --unit="{{alertmanager_pf_unit}}" --scope --collect \
-          -- kubectl -n monitoring port-forward svc/ztk-monitoring-k3s-alertmanager 18082:9093 \
-          >"{{state_dir}}/alertmanager-portforward.log" 2>&1 &
-        disown 2>/dev/null || true
-    fi
+    just _bind alertmanager {{alertmanager_pf_unit}} monitoring {{alertmanager_svc}} {{alertmanager_port}} 9093
 
 # (internal) print UI/password hints
 _argocd-info:
     #!/usr/bin/env bash
     set -euo pipefail
     echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n" | lolcat
-    echo "argocd UI: https://localhost:18081 (auto-bound; self-signed cert)" | lolcat
-    echo "traefik: http://localhost:18080 (auto-bound)" | lolcat
-    if kubectl -n monitoring get svc ztk-monitoring-k3s-alertmanager >/dev/null 2>&1; then
-        echo "alertmanager UI: http://localhost:18082 (auto-bound)" | lolcat
+    echo "argocd UI: https://localhost:{{argocd_ui_port}} (auto-bound; self-signed cert)" | lolcat
+    echo "traefik: http://localhost:{{traefik_port}} (auto-bound)" | lolcat
+    if systemctl --user is-active --quiet "{{alertmanager_pf_unit}}.scope" 2>/dev/null; then
+        echo "alertmanager UI: http://localhost:{{alertmanager_port}} (auto-bound)" | lolcat
     fi
 
 # Remove Argo CD (and everything it manages) from the cluster; the k3s node keeps running
@@ -174,7 +172,7 @@ rm: _k3s-ready
 nuke:
     #!/usr/bin/env bash
     set -euo pipefail
-    for u in "{{unit}}" "{{traefik_pf_unit}}" "{{argocd_pf_unit}}" "{{alertmanager_pf_unit}}"; do
+    for u in "{{k3s_unit}}" "{{traefik_pf_unit}}" "{{argocd_pf_unit}}" "{{alertmanager_pf_unit}}"; do
         if systemctl --user is-active --quiet "$u.scope" 2>/dev/null; then
             echo "+ systemctl --user stop $u.scope"
             systemctl --user stop "$u.scope"
