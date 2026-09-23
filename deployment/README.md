@@ -133,6 +133,10 @@ backend, for the startup wait. Kubelet probes, `kubectl exec` and
 `kubectl port-forward` still work. If Traefik runs somewhere other than
 k3s's `kube-system`, set `networkPolicy.ingressController`.
 
+The local rootless k3s node runs with `--disable-network-policy`, so it
+does not enforce these policies (see `flake.nix` for why). They only take
+effect on real clusters.
+
 **Container hardening:** every app container, init containers included,
 runs as uid 1000 with a read-only root filesystem, no Linux capabilities,
 no privilege escalation and the default seccomp profile. The images must
