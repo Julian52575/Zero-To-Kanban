@@ -91,6 +91,13 @@ jobs:
         with:
           warm: "false" # we build deployment/flake.nix below, not the root one
 
+      # Rootless k3s can't grow its netlink send buffer past this default
+      # (208 KB on ubuntu-latest), so its NetworkPolicy controller would only
+      # apply some of the chart's policies and pods could hang unreachable.
+      # See "Requirements" in deployment/README.md.
+      - name: Raise the default socket send buffer for rootless k3s
+        run: sudo sysctl -w net.core.wmem_default=4194304
+
       # Everything that touches the cluster has to run inside ONE
       # `nix develop --command` invocation: flake.nix's shellHook starts the
       # rootless k3s node via a systemd --user scope and registers a trap
