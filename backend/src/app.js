@@ -26,6 +26,7 @@ app.get('/items', getItems);
 app.get('/items/:id', getItem);
 app.post('/items', addItem);
 app.put('/items/:id', updateItem);
+app.patch('/items/:id', updateItem);
 app.delete('/items/:id', deleteItem);
 
 app.get('/projects', getProjects);
@@ -36,6 +37,7 @@ console.log('createProject value:', createProject);
 app.post('/projects', validateCreateProject, createProject);
 app.delete('/projects/:id', deleteProject);
 app.put('/projects/:id', updateProject);
+app.patch('/projects/:id', updateProject);
 
 
 module.exports = app;

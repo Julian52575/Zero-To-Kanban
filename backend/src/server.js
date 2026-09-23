@@ -11,6 +11,7 @@ async function startConsumers() {
     console.log(
       `Handling event: ${EVENTS.TASK_CREATED} with data: ${JSON.stringify(data)} and eventId: ${eventId}`,
     );
+
   });
   await startConsumeFor(EVENTS.TASK_UPDATED, async (data,eventId) => {
     console.log(
