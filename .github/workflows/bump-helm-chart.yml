@@ -1,17 +1,18 @@
 name: bump-helm-chart
 
 # Closes the loop after a release image lands on ghcr.io:
-#   gh release 2.1.0 -> ghcr.io/.../zero-to-kanban-{backend,frontend}:2.1.0 -> helm chart bumped to 2.1.0
+#   gh release 2.1.0 -> ghcr.io/.../zero-to-kanban-{backend,frontend,auth}:2.1.0 -> prod values bumped to 2.1.0
 #
 # Runs only after release-to-container-registry (release-to-ghcr.yml) finishes
 # successfully for an actual GitHub Release (not a manual/test
 # workflow_dispatch build), so the images referenced by the new tag are
 # guaranteed to already exist on ghcr.io.
 #
-# 1. bump-chart:  writes the new tag into values.yaml / Chart.yaml
-# 2. smoke-test:  actually deploys the bumped chart into a real k3s node
-#                 (deployment/flake.nix -- the same rootless k3s + helm
-#                 tooling used for local dev) and waits for it to go Ready
+# 1. bump-chart:  writes the new tag into values-prod.yaml / Chart.yaml
+# 2. smoke-test:  actually deploys the bumped chart, with the prod values,
+#                 into a real k3s node (deployment/flake.nix -- the same
+#                 rootless k3s + helm tooling used for local dev) and waits
+#                 for it to go Ready
 # 3. open-pr:     only runs if the smoke test passed; opens a PR rather than
 #                 pushing to main directly, mirroring the release-please
 #                 PR-then-merge pattern already used in this repo
@@ -54,9 +55,9 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          yq -i ".backend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
-          yq -i ".frontend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
-          yq -i ".auth.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
+          yq -i ".backend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values-prod.yaml
+          yq -i ".frontend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values-prod.yaml
+          yq -i ".auth.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values-prod.yaml
           yq -i ".appVersion = strenv(TAG)" deployment/helm/zero-to-kanban/Chart.yaml
 
       - name: Upload bumped chart files
@@ -64,7 +65,7 @@ jobs:
         with:
           name: bumped-chart-files
           path: |
-            deployment/helm/zero-to-kanban/values.yaml
+            deployment/helm/zero-to-kanban/values-prod.yaml
             deployment/helm/zero-to-kanban/Chart.yaml
           retention-days: 1
 
@@ -113,11 +114,23 @@ jobs:
           nix develop ./deployment --command bash -euo pipefail -c '
             kubectl create namespace ztk-smoke
 
+            # values-prod.yaml only names its Secrets (see "Shared /
+            # production cluster" in deployment/README.md): create
+            # throwaway ones so the prod values deploy as-is.
+            kubectl -n ztk-smoke create secret generic zero-to-kanban-prod-auth \
+              --from-literal=session-secret="$(openssl rand -hex 32)"
+            for db in postgresql authdb; do
+              kubectl -n ztk-smoke create secret generic "zero-to-kanban-prod-$db" \
+                --from-literal=password="$(openssl rand -hex 16)" \
+                --from-literal=postgres-password="$(openssl rand -hex 16)"
+            done
+
             helm dependency build deployment/helm/zero-to-kanban
 
             deploy_ok=1
             helm upgrade --install ztk-smoke deployment/helm/zero-to-kanban \
               --namespace ztk-smoke \
+              -f deployment/helm/zero-to-kanban/values-prod.yaml \
               --wait --timeout 5m \
               || deploy_ok=0
 
@@ -132,7 +145,7 @@ jobs:
               echo
               echo "| Workload | Image | Ready |"
               echo "| --- | --- | --- |"
-              for component in backend frontend; do
+              for component in backend frontend auth; do
                 dep="$(kubectl -n ztk-smoke get deploy -l app.kubernetes.io/component=$component -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || true)"
                 if [ -n "$dep" ]; then
                   image="$(kubectl -n ztk-smoke get deploy "$dep" -o jsonpath="{.spec.template.spec.containers[0].image}" 2>/dev/null || echo "?")"
@@ -157,6 +170,7 @@ jobs:
               kubectl -n ztk-smoke describe pods || true
               kubectl -n ztk-smoke logs -l app.kubernetes.io/component=backend --all-containers --tail=200 || true
               kubectl -n ztk-smoke logs -l app.kubernetes.io/component=frontend --all-containers --tail=200 || true
+              kubectl -n ztk-smoke logs -l app.kubernetes.io/component=auth --all-containers --tail=200 || true
               echo "::endgroup::"
               exit 1
             fi
@@ -188,11 +202,14 @@ jobs:
           delete-branch: true
           title: "chore(helm): bump image tag to ${{ needs.bump-chart.outputs.tag }}"
           body: |
-            Bumps `backend.image.tag` / `frontend.image.tag` in `values.yaml` and
-            `appVersion` in `Chart.yaml` to `${{ needs.bump-chart.outputs.tag }}`,
-            matching the image just published to ghcr.io by release
-            `${{ needs.bump-chart.outputs.tag }}`.
+            Bumps `backend.image.tag` / `frontend.image.tag` / `auth.image.tag` in
+            `values-prod.yaml` and `appVersion` in `Chart.yaml` to
+            `${{ needs.bump-chart.outputs.tag }}`, matching the images just
+            published to ghcr.io by release `${{ needs.bump-chart.outputs.tag }}`.
 
-            Verified by the `smoke-test` job: the bumped chart was deployed into a
-            real k3s node (rootless, via `deployment/flake.nix`) and reached Ready.
+            Verified by the `smoke-test` job: the bumped chart was deployed with the
+            prod values into a real k3s node (rootless, via `deployment/flake.nix`)
+            and reached Ready.
+
+            Merging does not deploy: `ztk-prod` is synced by hand in Argo CD.
           labels: helm,automated

@@ -182,7 +182,7 @@ first created. On an older dev volume, run `just nuke` to reset them.
 
 | Setting                | dev                                  | prod                                    |
 |------------------------|--------------------------------------|-----------------------------------------|
-| image tag / pull       | `manual-test`, `Always`              | `latest` (pin a release tag before real use) |
+| image tag / pull       | `manual-test`, `Always`              | release tag bumped on each release, `IfNotPresent` |
 | replicas (be/auth/fe)  | 1 / 1 / 1                            | 4 / 2 / 2                               |
 | frontend               | Vite dev server (1Gi limit)          | static bundle                           |
 | secrets                | plaintext defaults in `values.yaml`  | pre-created Secrets (`existingSecret`)  |
@@ -244,5 +244,9 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
    kubectl apply -n argocd -f argocd/root-app.yaml
    ```
 
-4. **Promote to prod:** after a change is verified in `ztk-dev`, sync
-   `ztk-prod` by hand from the Argo CD UI or with `argocd app sync ztk-prod`.
+4. **Release to prod:** each GitHub release publishes new images, then
+   `.github/workflows/bump-helm-chart.yml` writes the release tag into
+   `values-prod.yaml`, deploys the chart with the prod values into a
+   throwaway k3s node, and opens a PR if it becomes ready. Merge the PR, then
+   sync `ztk-prod` by hand from the Argo CD UI or with
+   `argocd app sync ztk-prod`.

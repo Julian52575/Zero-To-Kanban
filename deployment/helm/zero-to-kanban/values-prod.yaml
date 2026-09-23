@@ -1,8 +1,9 @@
 # Overrides for the prod environment. Used by the Argo CD Application in
 # deployment/argocd/environments/prod-app.yaml.
 #
-# NOTE: pin backend/frontend image tags to a release tag (not `latest`)
-# before this is used against a real prod cluster.
+# The backend/frontend/auth image tags below are written by
+# .github/workflows/bump-helm-chart.yml on every release, through a PR.
+# They stay `latest` until the first release bump.
 #
 # Every `existingSecret` below must be pre-created in ztk-prod before the
 # first sync -- see "Shared / production cluster" in deployment/README.md.
