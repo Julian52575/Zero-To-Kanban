@@ -16,8 +16,18 @@ deployment/
 
 ## Local quick start
 
-**Requirements:** Linux (WSL2 works) with Nix (flakes enabled) and a systemd
-user session with cgroup v2 delegation (`loginctl enable-linger $USER`).
+**Requirements:** Linux (WSL2 works) with Nix (flakes enabled), a systemd
+user session with cgroup v2 delegation (`loginctl enable-linger $USER`), and
+a larger default socket send buffer, set once per machine:
+
+```bash
+echo 'net.core.wmem_default = 4194304' | sudo tee /etc/sysctl.d/90-rootless-k3s.conf
+sudo sysctl --system
+```
+
+Without it, rootless k3s can only partly apply NetworkPolicies, and pods
+randomly can't reach each other. The shell prints a warning when the setting
+is missing.
 
 ```bash
 nix develop ./deployment   # enters the shell AND starts a rootless k3s node
@@ -88,6 +98,7 @@ The shell exports `KUBECONFIG` (pointing into the state dir) and `GIT_BRANCH`
 |-------------------------------------|----------------------------------------------------------------|
 | k3s won't start or became unready   | `$ZTK_STATE_DIR/.k3s/k3s.log`                                  |
 | `delegated cgroup v2 controllers are required` | systemd user session / linger is not set up (see the comments in `flake.nix`) |
+| pods can't reach each other, k3s.log shows `Aborting sync ... Message too long` | `net.core.wmem_default` is too low, see Requirements |
 | a localhost port stopped responding | `$ZTK_STATE_DIR/<name>-portforward.log`, then re-run `just up-local` |
 | app pods not coming up              | `kubectl -n ztk-dev-k3s get pods`, or the Argo CD UI           |
 

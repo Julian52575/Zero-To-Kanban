@@ -98,6 +98,16 @@
 
             echo "deployment shell ready -- k3s $(k3s --version | head -n1)"
 
+            # Rootless k3s can't enlarge its netlink send buffer past this
+            # (SO_SNDBUFFORCE needs host root), so with the 208 KB default
+            # the NetworkPolicy controller's iptables-restore batches fail
+            # with "Message too long" and only some policies get applied.
+            # Host-wide setting -- see "Requirements" in README.md.
+            if [ "$(cat /proc/sys/net/core/wmem_default)" -lt 4194304 ]; then
+              echo "WARNING: net.core.wmem_default is $(cat /proc/sys/net/core/wmem_default), NetworkPolicies will be applied only partially." >&2
+              echo "  fix: echo 'net.core.wmem_default = 4194304' | sudo tee /etc/sysctl.d/90-rootless-k3s.conf && sudo sysctl --system" >&2
+            fi
+
             if [ -n "$K3S_NO_AUTOSTART" ]; then
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
               echo "in flake.nix for why plain 'k3s server --rootless ...' can fail on WSL):"
