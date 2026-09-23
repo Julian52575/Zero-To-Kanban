@@ -9,7 +9,7 @@ deployment/
 ├── flake.nix                 dev shell (k3s, kubectl, helm, argocd, just); auto-starts k3s
 ├── justfile                  bootstrap / refresh / teardown recipes
 ├── argocd/
-│   ├── root-app.yaml         app-of-apps for a shared cluster (syncs environments/)
+│   ├── root-app.yaml         app-of-apps for the prod cluster (syncs prod-app.yaml)
 │   └── environments/         one Argo CD Application per environment
 └── helm/zero-to-kanban/      the app chart (auth, backend, frontend, RabbitMQ, 2x Postgres, Traefik routes)
 ```
@@ -222,7 +222,7 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 
 | File (in `argocd/environments/`) | App name             | Namespace     | Source                      | Auto-sync | Applied by                   |
 |----------------------------------|----------------------|---------------|-----------------------------|-----------|------------------------------|
-| `dev-app.yaml`                   | `ztk-dev`            | `ztk-dev`     | GitHub `main`, dev values   | yes       | `root-app.yaml`              |
+| `dev-app.yaml`                   | `ztk-dev`            | `ztk-dev`     | GitHub `main`, dev values   | yes       | manual `kubectl apply`, never on the prod cluster |
 | `prod-app.yaml`                  | `ztk-prod`           | `ztk-prod`    | GitHub `main`, prod values  | **no**    | `root-app.yaml`              |
 | `dev-k3s-app.yaml`               | `ztk-dev-k3s`        | `ztk-dev-k3s` | GitHub `main`, dev values   | yes       | `just up-gitops`             |
 | `dev-k3s-local-app.yaml`         | `ztk-dev-k3s-local`  | `ztk-dev-k3s` | local repo, current branch  | yes       | `just up-local` (template, don't apply directly) |
@@ -359,11 +359,16 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
      generic zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
    ```
 
-5. Apply the root app once. It then creates and manages `ztk-dev` and `ztk-prod`:
+5. Apply the root app once. It then creates and manages `ztk-prod`. It
+   never creates `ztk-dev`: dev runs on default credentials published in
+   this repo, so it must not share a public cluster with prod.
 
    ```bash
    kubectl apply -n argocd -f argocd/root-app.yaml
    ```
+
+   If an older root app already created `ztk-dev`, it deletes it on its
+   next sync (`prune: true`).
 
 6. **Release to prod:** each GitHub release publishes new images, then
    `.github/workflows/bump-helm-chart.yml` writes the release tag into
