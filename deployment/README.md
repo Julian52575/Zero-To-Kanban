@@ -190,9 +190,8 @@ first created. On an older dev volume, run `just nuke` to reset them.
 | `/metrics` route       | on                                   | off                                     |
 | DB volume sizes        | 1Gi / 1Gi                            | 10Gi / 5Gi                              |
 
-Postgres images are pinned to `bitnamilegacy/postgresql` because Bitnami
-removed the versioned tags. `values.yaml` alone does not set this pin, so
-always add an environment file.
+Postgres images are pinned in `values.yaml` to `bitnamilegacy/postgresql`,
+because Bitnami removed the versioned tags.
 
 Render it without a cluster:
 

@@ -63,15 +63,6 @@ ingress:
 postgresql:
   auth:
     existingSecret: zero-to-kanban-prod-postgresql
-  # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
-  # catalog restructuring and now only publishes a rolling `latest` -- the
-  # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
-  # available frozen under the bitnamilegacy mirror; pin that here (see the
-  # same override in values-dev.yaml).
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/postgresql
-    tag: 17.6.0-debian-12-r4
   primary:
     persistence:
       size: 10Gi
@@ -79,10 +70,6 @@ postgresql:
 authdb:
   auth:
     existingSecret: zero-to-kanban-prod-authdb
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/postgresql
-    tag: 17.6.0-debian-12-r4
   primary:
     persistence:
       size: 5Gi

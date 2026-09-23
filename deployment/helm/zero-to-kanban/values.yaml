@@ -120,6 +120,15 @@ networkPolicy:
 # https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 postgresql:
   enabled: true
+  # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
+  # catalog restructuring and now only publishes a rolling `latest` -- the
+  # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
+  # available frozen under the bitnamilegacy mirror; pin that here, for
+  # every environment.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: todo
     database: todo
@@ -153,6 +162,11 @@ postgresql:
 # separate credentials, storage and blast radius from the app DB above.
 authdb:
   enabled: true
+  # Same pin as postgresql.image above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: authuser
     database: auth
