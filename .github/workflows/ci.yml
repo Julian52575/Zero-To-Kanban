@@ -176,11 +176,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Load .env
+        run: |
+          cp .env.example .env
+          grep -E '^[A-Z_]+=' .env.example >> "$GITHUB_ENV"
+
       - name: Start the db service and wait for its healthcheck
         run: docker compose up -d --wait db
 
       - name: Check the database accepts connections
-        run: docker compose exec -T db pg_isready -U todo -d todo
+        run: docker compose exec -T db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 
       - name: Show db logs on failure
         if: failure()
