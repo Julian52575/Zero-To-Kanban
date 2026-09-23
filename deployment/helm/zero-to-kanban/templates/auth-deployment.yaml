@@ -24,11 +24,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- include "zero-to-kanban.waitFor" (dict "name" "authdb" "host" (include "zero-to-kanban.authdb.host" .) "port" 5432 "image" .Values.auth.image) | nindent 8 }}
+        {{- include "zero-to-kanban.waitFor" (dict "name" "authdb" "host" (include "zero-to-kanban.authdb.host" .) "port" 5432 "image" .Values.auth.image "securityContext" .Values.securityContext) | nindent 8 }}
       containers:
         - name: auth
           image: "{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
           imagePullPolicy: {{ .Values.auth.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.auth.containerPort }}

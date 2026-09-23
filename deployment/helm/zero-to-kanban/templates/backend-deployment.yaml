@@ -24,11 +24,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- include "zero-to-kanban.waitFor" (dict "name" "postgresql" "host" (include "zero-to-kanban.postgresql.host" .) "port" 5432 "image" .Values.backend.image) | nindent 8 }}
+        {{- include "zero-to-kanban.waitFor" (dict "name" "postgresql" "host" (include "zero-to-kanban.postgresql.host" .) "port" 5432 "image" .Values.backend.image "securityContext" .Values.securityContext) | nindent 8 }}
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.backend.containerPort }}

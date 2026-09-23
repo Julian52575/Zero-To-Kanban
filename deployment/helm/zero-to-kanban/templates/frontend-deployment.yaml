@@ -24,11 +24,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- include "zero-to-kanban.waitFor" (dict "name" "backend" "host" (printf "%s-backend" (include "zero-to-kanban.fullname" .)) "port" 3000 "image" .Values.frontend.image) | nindent 8 }}
+        {{- include "zero-to-kanban.waitFor" (dict "name" "backend" "host" (printf "%s-backend" (include "zero-to-kanban.fullname" .)) "port" 3000 "image" .Values.frontend.image "securityContext" .Values.securityContext) | nindent 8 }}
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.frontend.containerPort }}

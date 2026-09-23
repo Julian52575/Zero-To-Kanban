@@ -3,6 +3,22 @@
 
 imagePullSecrets: []
 
+# Applied to every app container, init containers included. The images run
+# as the `node` user (uid 1000); runAsUser is numeric because the kubelet
+# can't verify a named user isn't root. Nothing writes to the filesystem, so
+# the root filesystem is read-only.
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
 backend:
   image:
     repository: ghcr.io/julian52575/zero-to-kanban-backend

@@ -77,12 +77,14 @@ Init container that blocks until a Service accepts TCP connections. A
 ClusterIP Service only routes to Ready pods, so this really waits for the
 dependency's readinessProbe to pass, not just for its pod to exist. Runs in
 the calling component's own image (all node-based) -- no extra image pull.
-Usage: include "zero-to-kanban.waitFor" (dict "name" "db" "host" "..." "port" 5432 "image" .Values.backend.image)
+Usage: include "zero-to-kanban.waitFor" (dict "name" "db" "host" "..." "port" 5432 "image" .Values.backend.image "securityContext" .Values.securityContext)
 */}}
 {{- define "zero-to-kanban.waitFor" -}}
 - name: wait-for-{{ .name }}
   image: "{{ .image.repository }}:{{ .image.tag }}"
   imagePullPolicy: {{ .image.pullPolicy }}
+  securityContext:
+    {{- toYaml .securityContext | nindent 4 }}
   command:
     - sh
     - -c

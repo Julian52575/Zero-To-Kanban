@@ -133,6 +133,11 @@ backend, for the startup wait. Kubelet probes, `kubectl exec` and
 `kubectl port-forward` still work. If Traefik runs somewhere other than
 k3s's `kube-system`, set `networkPolicy.ingressController`.
 
+**Container hardening:** every app container, init containers included,
+runs as uid 1000 with a read-only root filesystem, no Linux capabilities,
+no privilege escalation and the default seccomp profile. The images must
+not need root or write to disk (see `securityContext` in `values.yaml`).
+
 **Dev credentials** are plaintext defaults in `values.yaml`, for disposable
 clusters only:
 
