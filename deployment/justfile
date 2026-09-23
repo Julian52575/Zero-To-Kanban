@@ -49,7 +49,7 @@ up-local: _k3s-ready _argocd-base _bind-traefik _bind-argocd-ui _bind-alertmanag
     sed -e "s#__REPO_ROOT__#{{repo_root}}#" -e "s#__TARGET_REVISION__#$branch#" \
       "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
       | kubectl apply -n argocd -f -
-    echo "argocd: ztk-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}}, branch $branch)" | lolcat
+    echo "argocd: ztk-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}}, branch $branch)"
     echo "  -> 'git commit' locally on $branch (no push needed); 'just refresh-local' to sync immediately"
     just _argocd-info
 
@@ -137,11 +137,11 @@ _bind-alertmanager-ui:
 _argocd-info:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n" | lolcat
-    echo "argocd UI: https://localhost:{{argocd_ui_port}} (auto-bound; self-signed cert)" | lolcat
-    echo "traefik: http://localhost:{{traefik_port}} (auto-bound)" | lolcat
+    echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n"
+    echo "argocd UI: https://localhost:{{argocd_ui_port}} (auto-bound; self-signed cert)"
+    echo "traefik: http://localhost:{{traefik_port}} (auto-bound)"
     if systemctl --user is-active --quiet "{{alertmanager_pf_unit}}.scope" 2>/dev/null; then
-        echo "alertmanager UI: http://localhost:{{alertmanager_port}} (auto-bound)" | lolcat
+        echo "alertmanager UI: http://localhost:{{alertmanager_port}} (auto-bound)"
     fi
 
 # Remove Argo CD (and everything it manages) from the cluster; the k3s node keeps running

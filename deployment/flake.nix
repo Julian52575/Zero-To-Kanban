@@ -34,7 +34,6 @@
             iptables
 
             jq
-            lolcat
             util-linux # setsid -- detaches the background k3s server from the tty
           ];
 
@@ -97,7 +96,7 @@
             STATE_DIR="''${ZTK_STATE_DIR:-''${XDG_STATE_HOME:-$HOME/.local/state}/zero-to-kanban-k3s}"
             # -------------------------------------------------------------------
 
-            echo "deployment shell ready -- k3s $(k3s --version | head -n1)" | lolcat
+            echo "deployment shell ready -- k3s $(k3s --version | head -n1)"
 
             if [ -n "$K3S_NO_AUTOSTART" ]; then
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
@@ -126,7 +125,7 @@
             # `main` -- lets you sync a dev branch without committing to
             # main. Falls back to "main" if HEAD is detached.
             export GIT_BRANCH="$(git -C "$DEPLOY_DIR" symbolic-ref --short -q HEAD || echo main)"
-            echo "GIT_BRANCH=$GIT_BRANCH (used by 'just up-local' as the Argo CD targetRevision)" | lolcat
+            echo "GIT_BRANCH=$GIT_BRANCH (used by 'just up-local' as the Argo CD targetRevision)"
 
             KUBECONFIG_PATH="$STATE_DIR/k3s.yaml"
             export KUBECONFIG="$KUBECONFIG_PATH"
@@ -161,11 +160,11 @@
 
             owned=""
             if _unit_active; then
-              echo "k3s: reusing already-running node (systemd --user unit $UNIT.scope)"  | lolcat
+              echo "k3s: reusing already-running node (systemd --user unit $UNIT.scope)"
             else
               echo "k3s: starting rootless node (first boot can take a minute)..."
               CPU_RANGE="0-$(( $(nproc) - 1 ))"
-              echo "+ setsid systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)" | lolcat
+              echo "+ setsid systemd-run --user --unit=$UNIT --scope --collect -p Delegate=yes -p CPUWeight=100 -p AllowedCPUs=$CPU_RANGE -p IOWeight=100 -- k3s server --rootless --write-kubeconfig $KUBECONFIG_PATH --write-kubeconfig-mode 644 --data-dir $DATA_DIR (backgrounded, log: $DATA_DIR/k3s.log)"
               # setsid: puts systemd-run (and the k3s it execs into via
               # --scope) in its own session, detached from this terminal.
               setsid systemd-run --user --unit="$UNIT" --scope --collect \
@@ -177,9 +176,9 @@
               disown 2>/dev/null || true
               owned=1
               if _wait_ready; then
-                echo "k3s: node ready (unit $UNIT.scope, stops when this shell exits; log: $DATA_DIR/k3s.log)" | lolcat
+                echo "k3s: node ready (unit $UNIT.scope, stops when this shell exits; log: $DATA_DIR/k3s.log)"
               else
-                echo "k3s: node did not become ready in time -- check $DATA_DIR/k3s.log" >&2 | lolcat
+                echo "k3s: node did not become ready in time -- check $DATA_DIR/k3s.log" >&2
               fi
               # Only the shell that started it tears it down.
               trap '
