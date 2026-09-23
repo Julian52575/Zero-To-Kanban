@@ -5,7 +5,10 @@ function validateCreateProject(req, res, next) {
 
     if (!result.success) {
         return res.status(400).json({
-            error: result.error.issues,
+            errors: result.error.issues.map((issue) => ({
+                field: issue.path.join('.') || 'body',
+                message: issue.message,
+            })),
         });
     }
 
