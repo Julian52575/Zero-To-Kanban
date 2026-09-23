@@ -182,7 +182,7 @@ first created. On an older dev volume, run `just nuke` to reset them.
 
 | Setting                | dev                                  | prod                                    |
 |------------------------|--------------------------------------|-----------------------------------------|
-| image tag / pull       | `manual-test`, `Always`              | release tag bumped on each release, `IfNotPresent` |
+| image tag / pull       | `manual-test`, `Always`              | release tag bumped on each release (`manual-test` until the first one), `IfNotPresent` |
 | replicas (be/auth/fe)  | 1 / 1 / 1                            | 4 / 2 / 2                               |
 | frontend memory limit  | 1Gi                                  | 128Mi                                   |
 | secrets                | plaintext defaults in `values.yaml`  | pre-created Secrets (`existingSecret`)  |

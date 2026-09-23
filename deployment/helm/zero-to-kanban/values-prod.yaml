@@ -3,14 +3,14 @@
 #
 # The backend/frontend/auth image tags below are written by
 # .github/workflows/bump-helm-chart.yml on every release, through a PR.
-# They stay `latest` until the first release bump.
+# They stay `manual-test` until the first release bump.
 #
 # Every `existingSecret` below must be pre-created in ztk-prod before the
 # first sync -- see "Shared / production cluster" in deployment/README.md.
 
 backend:
   image:
-    tag: latest
+    tag: manual-test
   replicaCount: 4
   resources:
     requests:
@@ -22,7 +22,7 @@ backend:
 
 auth:
   image:
-    tag: latest
+    tag: manual-test
   replicaCount: 2
   cookieSecure: "true"
   existingSecret: zero-to-kanban-prod-auth
@@ -36,7 +36,7 @@ auth:
 
 frontend:
   image:
-    tag: latest
+    tag: manual-test
   replicaCount: 2
   resources:
     requests:
