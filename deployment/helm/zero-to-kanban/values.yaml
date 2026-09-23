@@ -1,0 +1,186 @@
+# Default values for the zero-to-kanban chart.
+# Environment-specific overrides live in values-dev.yaml / values-prod.yaml.
+
+imagePullSecrets: []
+
+# Applied to every app container, init containers included. The images run
+# as the `node` user (uid 1000); runAsUser is numeric because the kubelet
+# can't verify a named user isn't root. Nothing writes to the filesystem, so
+# the root filesystem is read-only.
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+backend:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+auth:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-auth
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 4000
+  # Set "true" once the proxy terminates HTTPS (session cookie gets Secure).
+  cookieSecure: "false"
+  # Pre-created Secret holding the session-signing key (JWT HS256), see
+  # deployment/README.md. When empty, the chart creates one from
+  # sessionSecret below.
+  existingSecret: ""
+  existingSecretKey: session-secret
+  # Plaintext fallback, disposable dev only. Ignored when existingSecret is set.
+  sessionSecret: dev-only-change-me
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+frontend:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-frontend # closer to image name
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+ingress:
+  enabled: true
+  # entryPoints on the Traefik router (matches the `web` entrypoint the
+  # dev-mode Traefik proxy in docker-compose.yml listens on).
+  entryPoints:
+    - web
+  # Routes Traefik's own Prometheus metrics (router/service request counts
+  # and latency histograms -- infra metrics, no application data) through
+  # the same IngressRoute/entryPoints as the app, via Traefik's built-in
+  # `prometheus@internal` service -- no extra Traefik config needed, it's
+  # already scraping-ready. Guarded by its own BasicAuth (below), separate
+  # from the app's session/ForwardAuth -- so an app user account can't
+  # read cluster/router topology through it. See values-prod.yaml before
+  # exposing it publicly even so.
+  metrics:
+    enabled: true
+    path: /metrics
+    auth:
+      username: metrics
+      # Plaintext fallback, disposable dev only -- hashed into the
+      # Secret via Sprig's `htpasswd` (bcrypt) at template time, the
+      # plaintext itself is never stored. Ignored when existingSecret is
+      # set.
+      password: dev-only-change-me
+      # Pre-created Secret with a `users` key in htpasswd format, see
+      # deployment/README.md.
+      existingSecret: ""
+      existingSecretKey: users
+  tls:
+    enabled: false
+    secretName: ""
+
+# NetworkPolicies (templates/networkpolicy.yaml): auth/backend/frontend
+# only accept traffic from the ingress controller, each database only from
+# its own service. Point ingressController at wherever Traefik runs (k3s
+# ships it in kube-system).
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik
+
+# Bitnami postgresql subchart config. See:
+# https://github.com/bitnami/charts/tree/main/bitnami/postgresql
+postgresql:
+  enabled: true
+  # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
+  # catalog restructuring and now only publishes a rolling `latest` -- the
+  # chart's pinned default (17.6.0-debian-12-r4) 404s. Same image is still
+  # available frozen under the bitnamilegacy mirror; pin that here, for
+  # every environment.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
+  auth:
+    username: todo
+    database: todo
+    # Plaintext fallback password, only used when existingSecret is unset
+    # below (fine for disposable dev environments; never set this in
+    # values-prod.yaml -- use existingSecret there instead).
+    password: todo
+    # `postgres` superuser, kept so pg_dump/admin access has a known
+    # password. Same plaintext-fallback rule as `password` above.
+    enablePostgresUser: true
+    postgresPassword: postgres
+    # Pre-created Secret holding the Postgres passwords, see
+    # deployment/README.md. When set, `password` and `postgresPassword`
+    # above are ignored and the bitnami subchart won't generate its own
+    # Secret.
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+    # The subchart's own policy allows any pod in (allowExternal: true);
+    # NetworkPolicies add up, so it would cancel ours. networkPolicy above
+    # replaces it.
+    networkPolicy:
+      enabled: false
+
+# Dedicated Postgres for the auth service (alias of the bitnami subchart):
+# separate credentials, storage and blast radius from the app DB above.
+authdb:
+  enabled: true
+  # Same pin as postgresql.image above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
+  auth:
+    username: authuser
+    database: auth
+    password: authpass
+    enablePostgresUser: true
+    postgresPassword: postgres
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+    # See postgresql.primary.networkPolicy above.
+    networkPolicy:
+      enabled: false

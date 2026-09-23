@@ -1,0 +1,68 @@
+{{- if .Values.ingress.enabled }}
+# Requires the Traefik CRDs (IngressRoute) installed in-cluster -- see
+# https://doc.traefik.io/traefik/reference/dynamic-configuration/kubernetes-crd/
+#
+# Routing mirrors the docker-compose Traefik proxy: /auth, /login, /register
+# -> auth (priority 100, public), /items -> backend (priority 10), everything
+# else -> frontend (priority 1, catch-all). backend and frontend are guarded
+# by strip-identity + require-login (ForwardAuth to the auth service).
+#
+# No Host() match -- routes on path alone, so any hostname/IP reaching
+# these entryPoints works with no /etc/hosts entry needed. This also keeps
+# the frontend's dev server seeing whatever Host header the client actually
+# sent (e.g. localhost/127.0.0.1), which Vite's server.allowedHosts check
+# accepts by default, instead of requiring a custom allowedHosts entry.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "zero-to-kanban.fullname" . }}
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingress.entryPoints | nindent 4 }}
+  routes:
+    - match: PathPrefix(`/auth`) || Path(`/login`) || Path(`/register`)
+      kind: Rule
+      priority: 100
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-auth
+          port: 4000
+    - match: PathPrefix(`/items`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-strip-identity
+        - name: {{ include "zero-to-kanban.fullname" . }}-require-login
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-backend
+          port: 3000
+    - match: PathPrefix(`/`)
+      kind: Rule
+      priority: 1
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-strip-identity
+        - name: {{ include "zero-to-kanban.fullname" . }}-require-login
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-frontend
+          port: 3000
+    {{- if .Values.ingress.metrics.enabled }}
+    # Traefik's own Prometheus metrics, via its built-in internal service --
+    # not one of ours, so no port/namespace to set. Priority just needs to
+    # beat the `/` catch-all above; it can't collide with /auth or /items.
+    # Guarded by its own BasicAuth (metrics-auth.yaml), not the app's
+    # strip-identity/require-login pair -- see that file for why.
+    - match: PathPrefix(`{{ .Values.ingress.metrics.path }}`)
+      kind: Rule
+      priority: 50
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-metrics-auth
+      services:
+        - name: prometheus@internal
+          kind: TraefikService
+    {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+{{- end }}

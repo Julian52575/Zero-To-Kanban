@@ -41,3 +41,8 @@ node_modules/
 /.scannerwork/
 /.sast/codeql-db/
 /.sast/codeql-results/
+
+# Kubernetes package
+deployment/.k3s/
+deployment/k3s.yaml
+deployment/helm/*/charts/*.tgz

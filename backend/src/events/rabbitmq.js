@@ -1,11 +1,11 @@
 const amqp = require("amqplib");
 
-const {
-  RABBITMQ_USER,
-  RABBITMQ_PASSWORD,
-  RABBITMQ_HOST = "localhost",
-  RABBITMQ_PORT = 5672,
-} = process.env;
+// `||` rather than destructuring defaults: compose passes unset vars through
+// as empty strings, which destructuring defaults would not replace.
+const RABBITMQ_USER = process.env.RABBITMQ_USER || "guest";
+const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || "guest";
+const RABBITMQ_HOST = process.env.RABBITMQ_HOST || "localhost";
+const RABBITMQ_PORT = process.env.RABBITMQ_PORT || 5672;
 
 let connection;
 let channel;
@@ -28,7 +28,7 @@ async function connectRabbitMQ() {
     console.error("RabbitMQ connection closed. Attempting to reconnect...");
     channel = undefined;
     connection = undefined;
-    setTimeout(() => reconnectRabbitMQ(port), 5000);
+    setTimeout(reconnectRabbitMQ, 5000);
   });
 
   connection.on("error", (err) => {
@@ -36,12 +36,12 @@ async function connectRabbitMQ() {
   });
 }
 
-async function reconnectRabbitMQ(port) {
+async function reconnectRabbitMQ() {
   if (reconnecting || shuttingDown) return;
   reconnecting = true;
   try {
     console.log("Trying to reconnect to RabbitMQ...");
-    await connectRabbitMQ(port);
+    await connectRabbitMQ();
     const { restartConsumers } = require("./eventBus");
     await restartConsumers();
     console.log("Reconnected to RabbitMQ and restarted consumers.");
@@ -49,7 +49,7 @@ async function reconnectRabbitMQ(port) {
   } catch (err) {
     console.error("Failed to reconnect to RabbitMQ:", err);
     reconnecting = false;
-    setTimeout(() => reconnectRabbitMQ(port), 5000);
+    setTimeout(reconnectRabbitMQ, 5000);
   }
 }
 

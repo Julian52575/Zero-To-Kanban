@@ -1,0 +1,22 @@
+apiVersion: v2
+name: zero-to-kanban
+description: Helm chart for the Zero To Kanban Test app (backend, frontend, auth, 2x Postgres)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  # charts.bitnami.com (the classic Helm repo) now just redirects to
+  # repo.broadcom.com -- still works, but going straight to Bitnami's OCI
+  # registry skips the `helm repo add` round-trip entirely (no separate
+  # repo registration step for Argo CD's repo-server to time out on).
+  # OCI deps need an exact version, not a "16.x.x" range -- no index.yaml
+  # to resolve ranges against. Pinned to what Chart.lock already resolved.
+  - name: postgresql
+    version: "16.7.27"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled
+  - name: postgresql
+    alias: authdb
+    version: "16.7.27"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: authdb.enabled

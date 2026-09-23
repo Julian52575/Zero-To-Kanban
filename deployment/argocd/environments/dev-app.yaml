@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ztk-dev
+  namespace: argocd
+  # Dev only: deleting this Application also deletes everything it deployed
+  # (`just rm` relies on this). Prod leaves it off so an accidental delete
+  # can't take the workloads and their data with it.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
+    targetRevision: main
+    path: deployment/helm/zero-to-kanban
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ztk-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,76 @@
+# Overrides for the prod environment. Used by the Argo CD Application in
+# deployment/argocd/environments/prod-app.yaml.
+#
+# The backend/frontend/auth image tags below are written by
+# .github/workflows/bump-helm-chart.yml on every release, through a PR.
+# They stay `manual-test` until the first release bump.
+#
+# Every `existingSecret` below must be pre-created in ztk-prod before the
+# first sync -- see "Shared / production cluster" in deployment/README.md.
+
+backend:
+  image:
+    tag: manual-test
+  replicaCount: 4
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+auth:
+  image:
+    tag: manual-test
+  replicaCount: 2
+  cookieSecure: "true"
+  existingSecret: zero-to-kanban-prod-auth
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+frontend:
+  image:
+    tag: manual-test
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+ingress:
+  entryPoints:
+    - websecure
+  # values.yaml default-enables /metrics for local/dev testing, where the
+  # entrypoint isn't internet-reachable. Here it would be: the route is
+  # behind BasicAuth, but it still discloses router topology/error rates to
+  # anyone holding that one shared credential, so keep it off unless an
+  # out-of-cluster scraper needs it (an in-cluster Prometheus scrapes
+  # Traefik's :9100 metrics entrypoint directly, no route needed).
+  metrics:
+    enabled: false
+  tls:
+    enabled: true
+    secretName: kanban-tls
+
+postgresql:
+  auth:
+    existingSecret: zero-to-kanban-prod-postgresql
+  primary:
+    persistence:
+      size: 10Gi
+
+authdb:
+  auth:
+    existingSecret: zero-to-kanban-prod-authdb
+  primary:
+    persistence:
+      size: 5Gi

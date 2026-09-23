@@ -1,0 +1,40 @@
+# Dev Application for a local, rootless k3s cluster (see deployment/flake.nix).
+#
+# k3s bundles its own Traefik (CRDs included), so templates/ingressroute.yaml
+# works against it unmodified -- nothing else to install for ingress. This
+# is otherwise identical to dev-app.yaml; kept as a separate Application so
+# a local k3s run never collides with a shared/remote dev cluster synced
+# from dev-app.yaml.
+#
+# Applied directly for local use by `just up-gitops` (deployment/justfile),
+# which also installs Argo CD first -- not discovered through root-app.yaml,
+# which excludes it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ztk-dev-k3s
+  namespace: argocd
+  # Dev only: deleting this Application also deletes everything it deployed
+  # (`just rm` relies on this). Prod leaves it off so an accidental delete
+  # can't take the workloads and their data with it.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
+    targetRevision: main
+    path: deployment/helm/zero-to-kanban
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ztk-dev-k3s
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

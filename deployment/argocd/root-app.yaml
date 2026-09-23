@@ -1,0 +1,34 @@
+# App-of-apps root: point Argo CD at this Application once, and it will
+# discover/manage the per-environment child Applications in ./environments.
+#
+#   kubectl apply -n argocd -f deployment/argocd/root-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ztk-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
+    targetRevision: main
+    path: deployment/argocd/environments
+    directory:
+      recurse: false
+      # The *-k3s* Applications are for standalone local k3s use only (see
+      # their own comments; dev-k3s-local-app.yaml is a template that
+      # `just up-local` fills in) -- exclude them so a
+      # shared/real root-app sync never spawns them pointed at the wrong
+      # cluster.
+      exclude: "{dev-k3s-app.yaml,monitoring-k3s-app.yaml,dev-k3s-local-app.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
