@@ -64,7 +64,7 @@ across restarts.
 | `just`                         | list recipes                                                           |
 | `just up-local` / `up-gitops`  | install Argo CD if missing, apply the Application, bind the local ports (safe to re-run) |
 | `just refresh-local` / `refresh-gitops` | make Argo CD re-read the repo now instead of on its next poll |
-| `just rm`                      | delete the Argo CD Applications and Argo CD itself. The k3s node keeps running. |
+| `just rm`                      | delete the Argo CD Applications, everything they deployed, and Argo CD itself. Database volumes and the k3s node are kept. |
 | `just down`                    | stop k3s and the port-forwards. Data on disk is kept.                  |
 | `just nuke`                    | stop k3s and delete all its data (Argo CD, databases, everything)      |
 

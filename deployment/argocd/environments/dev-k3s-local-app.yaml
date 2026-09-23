@@ -26,6 +26,11 @@ kind: Application
 metadata:
   name: ztk-dev-k3s-local
   namespace: argocd
+  # Dev only: deleting this Application also deletes everything it deployed
+  # (`just rm` relies on this). Prod leaves it off so an accidental delete
+  # can't take the workloads and their data with it.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
