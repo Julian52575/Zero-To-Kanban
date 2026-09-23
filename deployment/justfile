@@ -191,7 +191,13 @@ _stop-units-matching pattern:
     fi
     for u in $units; do
         echo "+ systemctl --user stop $u"
-        systemctl --user stop "$u"
+        # Stopping k3s kills its port-forwards, and their --collect scopes
+        # vanish before the loop reaches them ("Unit ... not loaded"). Only
+        # a unit that is still running counts as a failure.
+        if ! systemctl --user stop "$u" 2>/dev/null && systemctl --user is-active --quiet "$u"; then
+            echo "failed to stop $u" >&2
+            exit 1
+        fi
     done
 
 # Stop the rootless k3s node and its port-forwards; data on disk (Argo CD, Postgres, everything) is kept for next 'just up-local'/'up-gitops'
