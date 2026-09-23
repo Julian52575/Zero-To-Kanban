@@ -21,7 +21,7 @@ async function createTask(columnId, creatorId, taskData) {
   return response;
 }
 
-async function updateTask(id,userId, taskData) {
+async function updateTask(id, userId, taskData) {
   if (!(await userCanAccessProject(userId, taskData.projectId))) {
     return null;
   }
@@ -46,6 +46,7 @@ async function deleteTask(id, userId) {
 
   return await taskRepository.deleteById(id);
 }
+
 module.exports = {
   getTasks,
   getTask,

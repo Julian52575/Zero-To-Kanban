@@ -31,6 +31,7 @@ services:
       - --entrypoints.web.address=:80
       - --api.dashboard=true
       - --api.insecure=true # dashboard on :8080 with no auth -- dev only
+      - --api.insecure=true # dashboard on :8080 with no auth -- dev only
       - --accesslog=true
     ports:
       - "${PROXY_PORT:-8000}:80"

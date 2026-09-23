@@ -54,3 +54,7 @@ model Project {
   @@index([ownerId])
 }
 
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}
