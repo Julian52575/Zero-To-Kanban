@@ -70,11 +70,28 @@ ingress:
   # and latency histograms -- infra metrics, no application data) through
   # the same IngressRoute/entryPoints as the app, via Traefik's built-in
   # `prometheus@internal` service -- no extra Traefik config needed, it's
-  # already scraping-ready. Unauthenticated: fine on a private/dev
-  # entrypoint, but see values-prod.yaml before exposing it publicly.
+  # already scraping-ready. Guarded by its own BasicAuth (below), separate
+  # from the app's session/ForwardAuth -- so an app user account can't
+  # read cluster/router topology through it. See values-prod.yaml before
+  # exposing it publicly even so.
   metrics:
     enabled: true
     path: /metrics
+    auth:
+      username: metrics
+      # Plaintext fallback, disposable dev only -- hashed into the
+      # Secret via Sprig's `htpasswd` (bcrypt) at template time, the
+      # plaintext itself is never stored. Ignored when existingSecret is
+      # set.
+      password: dev-only-change-me
+      # Secret with a `users` key in htpasswd format (one "name:hash" per
+      # line, e.g. from `htpasswd -nBC 10 metrics`). Pre-create it for
+      # prod:
+      #   htpasswd -nBC 10 metrics | kubectl create secret generic \
+      #     zero-to-kanban-prod-metrics-auth --namespace ztk-prod \
+      #     --from-file=users=/dev/stdin
+      existingSecret: ""
+      existingSecretKey: users
   tls:
     enabled: false
     secretName: ""

@@ -50,9 +50,13 @@ spec:
     # Traefik's own Prometheus metrics, via its built-in internal service --
     # not one of ours, so no port/namespace to set. Priority just needs to
     # beat the `/` catch-all above; it can't collide with /auth or /items.
+    # Guarded by its own BasicAuth (metrics-auth.yaml), not the app's
+    # strip-identity/require-login pair -- see that file for why.
     - match: PathPrefix(`{{ .Values.ingress.metrics.path }}`)
       kind: Rule
       priority: 50
+      middlewares:
+        - name: {{ include "zero-to-kanban.fullname" . }}-metrics-auth
       services:
         - name: prometheus@internal
           kind: TraefikService

@@ -61,3 +61,13 @@ Name of the Secret holding the Postgres password.
 {{- define "zero-to-kanban.auth.secretName" -}}
 {{- default (printf "%s-auth" (include "zero-to-kanban.fullname" .)) .Values.auth.existingSecret -}}
 {{- end -}}
+
+{{/* Name of the Secret holding /metrics' BasicAuth htpasswd file */}}
+{{- define "zero-to-kanban.metricsAuth.secretName" -}}
+{{- default (printf "%s-metrics-auth" (include "zero-to-kanban.fullname" .)) .Values.ingress.metrics.auth.existingSecret -}}
+{{- end -}}
+
+{{/* Key within that Secret that holds the htpasswd content */}}
+{{- define "zero-to-kanban.metricsAuth.secretKey" -}}
+{{- .Values.ingress.metrics.auth.existingSecretKey | default "users" -}}
+{{- end -}}
