@@ -1,0 +1,86 @@
+# Mirrors the `rabbitmq` service in docker-compose.yml. A StatefulSet so the
+# pod keeps its hostname across restarts: RabbitMQ names its node (and its
+# data directory on the volume) after it, and a new hostname would start
+# from an empty broker.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "zero-to-kanban.rabbitmq.host" . }}
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  serviceName: {{ include "zero-to-kanban.rabbitmq.host" . }}
+  # Single node: more replicas would be separate, unclustered brokers.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "zero-to-kanban.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "zero-to-kanban.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: rabbitmq
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Makes the volume writable by the non-root rabbitmq user, like the
+      # `:U` volume flag in docker-compose.yml.
+      securityContext:
+        fsGroup: {{ .Values.rabbitmq.securityContext.runAsGroup }}
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
+          imagePullPolicy: {{ .Values.rabbitmq.image.pullPolicy }}
+          securityContext:
+            {{- toYaml (merge (deepCopy .Values.rabbitmq.securityContext) .Values.securityContext) | nindent 12 }}
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.rabbitmq.username | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "zero-to-kanban.rabbitmq.secretName" . }}
+                  key: {{ .Values.rabbitmq.existingSecretKey }}
+          # Each check starts an Erlang CLI VM, hence the generous timeouts.
+          # Readiness is the compose healthcheck; liveness only asks whether
+          # the node answers at all.
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_running"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+          resources:
+            {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "zero-to-kanban.labels" . | nindent 10 }}
+          app.kubernetes.io/component: rabbitmq
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.rabbitmq.persistence.size }}

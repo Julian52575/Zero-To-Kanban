@@ -31,6 +31,10 @@ frontend:
       cpu: 500m
       memory: 1Gi
 
+rabbitmq:
+  persistence:
+    size: 1Gi
+
 postgresql:
   primary:
     persistence:

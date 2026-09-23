@@ -1,6 +1,6 @@
 {{- if .Values.ingress.enabled }}
-# Mirrors the `require-login` / `strip-identity` middlewares defined by
-# labels in docker-compose.yml.
+# Mirrors the `require-login` / `strip-identity` / `backend-stripprefix`
+# middlewares defined by labels in docker-compose.yml.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -26,4 +26,16 @@ spec:
     customRequestHeaders:
       X-Auth-User-Id: ""
       X-Auth-User-Name: ""
+---
+# The backend serves /items, the browser calls /api/items.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "zero-to-kanban.fullname" . }}-backend-stripprefix
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
 {{- end }}

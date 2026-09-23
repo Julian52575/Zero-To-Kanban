@@ -46,6 +46,11 @@ frontend:
       cpu: 250m
       memory: 128Mi
 
+rabbitmq:
+  existingSecret: zero-to-kanban-prod-rabbitmq
+  persistence:
+    size: 2Gi
+
 ingress:
   entryPoints:
     - websecure

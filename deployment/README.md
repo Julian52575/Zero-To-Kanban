@@ -11,7 +11,7 @@ deployment/
 ├── argocd/
 │   ├── root-app.yaml         app-of-apps for a shared cluster (syncs environments/)
 │   └── environments/         one Argo CD Application per environment
-└── helm/zero-to-kanban/      the app chart (auth, backend, frontend, 2x Postgres, Traefik routes)
+└── helm/zero-to-kanban/      the app chart (auth, backend, frontend, RabbitMQ, 2x Postgres, Traefik routes)
 ```
 
 ## Local quick start
@@ -111,17 +111,21 @@ The shell exports `KUBECONFIG` (pointing into the state dir) and `GIT_BRANCH`
 | `auth`     | `ghcr.io/julian52575/zero-to-kanban-auth`     | 4000 | `authdb` (its own Postgres)     |
 | `backend`  | `ghcr.io/julian52575/zero-to-kanban-backend`  | 3000 | `postgresql`                    |
 | `frontend` | `ghcr.io/julian52575/zero-to-kanban-frontend` | 3000 | none                               |
+| `rabbitmq` | `docker.io/library/rabbitmq:4-management`     | 5672, 15672 (UI) | none              |
 
 Both Postgres instances come from the Bitnami `postgresql` chart. Services
-run their own migrations on startup.
+run their own migrations on startup. RabbitMQ carries the backend's domain
+events. It is a single-node StatefulSet using the same image as
+`docker-compose.yml`, with its data on its own volume.
 
 **Startup order:** each pod has a `wait-for-*` init container that holds it
 until the Service it depends on accepts connections. A Service only routes
 to ready pods, so this waits for the dependency's readiness probe to pass:
 
 ```
-postgresql ──▶ backend ──▶ frontend
-authdb     ──▶ auth
+postgresql ──┬▶ backend ──▶ frontend
+rabbitmq   ──┘
+authdb     ────▶ auth
 ```
 
 **Routing** is done by a Traefik `IngressRoute` that matches on path only,
@@ -131,16 +135,16 @@ with no hostname. It is the same routing as `docker-compose.yml`:
 |-------------------------------|-----------------------|----------------------------------------------|
 | `/auth*`, `/login`, `/register` | auth                | public                                       |
 | `/metrics`                    | Traefik's own metrics | separate BasicAuth (`ingress.metrics.auth`)  |
-| `/items*`                     | backend               | login required (ForwardAuth to auth)         |
+| `/api*`                       | backend, `/api` removed from the path | login required (ForwardAuth to auth) |
 | everything else               | frontend              | login required                               |
 
 On protected routes, client-sent `X-Auth-User-*` headers are removed. The
 auth service then sets them after it checks the session.
 
 **Network policies** make Traefik the only way in: auth, backend and
-frontend accept traffic only from the Traefik pods, `postgresql` only from
-backend, and `authdb` only from auth. The one exception is frontend →
-backend, for the startup wait. Kubelet probes, `kubectl exec` and
+frontend accept traffic only from the Traefik pods, `postgresql` and
+`rabbitmq` (AMQP port only) only from backend, and `authdb` only from auth.
+The one exception is frontend → backend, for the startup wait. Kubelet probes, `kubectl exec` and
 `kubectl port-forward` still work. If Traefik runs somewhere other than
 k3s's `kube-system`, set `networkPolicy.ingressController`.
 
@@ -148,6 +152,8 @@ k3s's `kube-system`, set `networkPolicy.ingressController`.
 runs as uid 1000 with a read-only root filesystem, no Linux capabilities,
 no privilege escalation and the default seccomp profile. The images must
 not need root or write to disk (see `securityContext` in `values.yaml`).
+`rabbitmq` gets the same settings but runs as its image's uid 999, and
+writes only to its volume.
 
 **Dev credentials** are plaintext defaults in `values.yaml`, for disposable
 clusters only:
@@ -158,10 +164,21 @@ clusters only:
 | app DB (`postgresql`)     | user `todo`, password `todo`, database `todo`; superuser `postgres` / `postgres` |
 | auth DB (`authdb`)        | user `authuser`, password `authpass`, database `auth`; superuser `postgres` / `postgres` |
 | session signing key       | `dev-only-change-me`                    |
+| RabbitMQ                  | `user` / `dev-only-change-me`           |
 
 The `/metrics` Secret stores only a bcrypt hash, so the password can't be
 read back from the cluster. Get it from `values.yaml` in dev, or from
 whoever created the Secret in prod.
+
+**RabbitMQ management UI:** not routed by Traefik. Forward it, then open
+http://localhost:15672:
+
+```bash
+kubectl -n ztk-dev-k3s port-forward svc/ztk-dev-k3s-local-zero-to-kanban-rabbitmq 15672
+```
+
+RabbitMQ, like Postgres, only takes its user and password when its volume
+is first created.
 
 **Database dumps:** run `pg_dump` inside the database pod as the `postgres`
 superuser. No local Postgres client is needed:
@@ -189,6 +206,7 @@ first created. On an older dev volume, run `just nuke` to reset them.
 | entrypoint / TLS       | `web`, no TLS                        | `websecure`, TLS from Secret `kanban-tls` |
 | `/metrics` route       | on                                   | off                                     |
 | DB volume sizes        | 1Gi / 1Gi                            | 10Gi / 5Gi                              |
+| RabbitMQ volume size   | 1Gi                                  | 2Gi                                     |
 
 Postgres images are pinned in `values.yaml` to `bitnamilegacy/postgresql`,
 because Bitnami removed the versioned tags.
@@ -226,6 +244,9 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
      --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-authdb \
      --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
+   # hex only: the backend puts it into an amqp:// URL without escaping it
+   kubectl -n ztk-prod create secret generic zero-to-kanban-prod-rabbitmq \
+     --from-literal=password="$(openssl rand -hex 32)"
    kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
    ```
 

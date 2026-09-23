@@ -124,6 +124,8 @@ jobs:
                 --from-literal=password="$(openssl rand -hex 16)" \
                 --from-literal=postgres-password="$(openssl rand -hex 16)"
             done
+            kubectl -n ztk-smoke create secret generic zero-to-kanban-prod-rabbitmq \
+              --from-literal=password="$(openssl rand -hex 16)"
 
             helm dependency build deployment/helm/zero-to-kanban
 
