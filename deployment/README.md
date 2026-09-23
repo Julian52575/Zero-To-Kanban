@@ -117,6 +117,20 @@ with no hostname. It is the same routing as `docker-compose.yml`:
 On protected routes, client-sent `X-Auth-User-*` headers are removed. The
 auth service then sets them after it checks the session.
 
+**Dev credentials** are plaintext defaults in `values.yaml`, for disposable
+clusters only:
+
+| What                      | Value                                   |
+|---------------------------|-----------------------------------------|
+| `/metrics` BasicAuth      | `metrics` / `dev-only-change-me`, e.g. `curl -u metrics:dev-only-change-me http://localhost:18080/metrics` |
+| app DB (`postgresql`)     | user `todo`, password `todo`, database `todo` |
+| auth DB (`authdb`)        | user `authuser`, password `authpass`, database `auth` |
+| session signing key       | `dev-only-change-me`                    |
+
+The `/metrics` Secret stores only a bcrypt hash, so the password can't be
+read back from the cluster. Get it from `values.yaml` in dev, or from
+whoever created the Secret in prod.
+
 **Values files:** `values.yaml` holds the defaults. `values-dev.yaml` or
 `values-prod.yaml` is layered on top of it.
 
@@ -154,7 +168,9 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 ## Shared / production cluster
 
 1. Install Argo CD in the cluster.
-2. Create the prod Secrets in `ztk-prod` (Argo CD never sees these values):
+2. Create the prod Secrets in `ztk-prod`. `values-prod.yaml` only names
+   them, so Argo CD never sees the values. Sealed Secrets or the External
+   Secrets Operator can create them instead of `kubectl`.
 
    ```bash
    kubectl create namespace ztk-prod
@@ -168,6 +184,14 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
    kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
    ```
 
+   `/metrics` is off in prod. To turn it on, set `ingress.metrics.enabled: true`
+   and `ingress.metrics.auth.existingSecret: zero-to-kanban-prod-metrics-auth`,
+   then create that Secret. It holds an htpasswd file under the key `users`:
+
+   ```bash
+   htpasswd -nBC 10 metrics | kubectl -n ztk-prod create secret generic \
+     zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
+   ```
 
 3. Apply the root app once. It then creates and manages `ztk-dev` and `ztk-prod`:
 

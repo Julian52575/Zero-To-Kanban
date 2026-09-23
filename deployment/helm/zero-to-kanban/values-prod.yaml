@@ -4,13 +4,8 @@
 # NOTE: pin backend/frontend image tags to a release tag (not `latest`)
 # before this is used against a real prod cluster.
 #
-# Postgres password: pre-create the Secret referenced below in the
-# ztk-prod namespace before syncing this Application, e.g.:
-#   kubectl create secret generic zero-to-kanban-prod-postgresql \
-#     --namespace ztk-prod \
-#     --from-literal=password='<strong-password>'
-# (or manage it via Sealed Secrets / External Secrets Operator instead of
-# kubectl directly). Argo CD never sees the plaintext value either way.
+# Every `existingSecret` below must be pre-created in ztk-prod before the
+# first sync -- see "Shared / production cluster" in deployment/README.md.
 
 backend:
   image:
@@ -81,9 +76,6 @@ postgresql:
     persistence:
       size: 10Gi
 
-# Pre-create the auth DB Secret too (key: password):
-#   kubectl create secret generic zero-to-kanban-prod-authdb \
-#     --namespace ztk-prod --from-literal=password='<strong-password>'
 authdb:
   auth:
     existingSecret: zero-to-kanban-prod-authdb

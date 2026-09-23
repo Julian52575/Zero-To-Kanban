@@ -27,12 +27,9 @@ auth:
   containerPort: 4000
   # Set "true" once the proxy terminates HTTPS (session cookie gets Secure).
   cookieSecure: "false"
-  # Secret holding the session-signing key (JWT HS256). When empty, the chart
-  # does NOT create one -- dev must set sessionSecret below; prod should use
-  # existingSecret:
-  #   kubectl create secret generic zero-to-kanban-prod-auth \
-  #     --namespace ztk-prod \
-  #     --from-literal=session-secret="$(openssl rand -hex 32)"
+  # Pre-created Secret holding the session-signing key (JWT HS256), see
+  # deployment/README.md. When empty, the chart creates one from
+  # sessionSecret below.
   existingSecret: ""
   existingSecretKey: session-secret
   # Plaintext fallback, disposable dev only. Ignored when existingSecret is set.
@@ -84,12 +81,8 @@ ingress:
       # plaintext itself is never stored. Ignored when existingSecret is
       # set.
       password: dev-only-change-me
-      # Secret with a `users` key in htpasswd format (one "name:hash" per
-      # line, e.g. from `htpasswd -nBC 10 metrics`). Pre-create it for
-      # prod:
-      #   htpasswd -nBC 10 metrics | kubectl create secret generic \
-      #     zero-to-kanban-prod-metrics-auth --namespace ztk-prod \
-      #     --from-file=users=/dev/stdin
+      # Pre-created Secret with a `users` key in htpasswd format, see
+      # deployment/README.md.
       existingSecret: ""
       existingSecretKey: users
   tls:
@@ -107,12 +100,9 @@ postgresql:
     # below (fine for disposable dev environments; never set this in
     # values-prod.yaml -- use existingSecret there instead).
     password: todo
-    # Name of a pre-created Secret holding the Postgres password. When set,
-    # `password` above is ignored and the bitnami subchart won't generate
-    # its own Secret. Create it out-of-band, e.g.:
-    #   kubectl create secret generic zero-to-kanban-prod-postgresql \
-    #     --namespace ztk-prod \
-    #     --from-literal=password='<strong-password>'
+    # Pre-created Secret holding the Postgres passwords, see
+    # deployment/README.md. When set, `password` above is ignored and the
+    # bitnami subchart won't generate its own Secret.
     existingSecret: ""
     secretKeys:
       userPasswordKey: password
