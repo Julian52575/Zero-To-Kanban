@@ -1,8 +1,16 @@
 const itemRepository = require('../repositories/itemRepository');
 const { v4: uuid } = require('uuid');
 
+const { publishEvent } = require('../events/eventBus');
+const { EVENTS } = require("../events/events");
+
+
 async function getItems() {
     return itemRepository.getAll();
+}
+
+async function getItem(id) {
+    return itemRepository.getById(id);
 }
 
 async function createItem(data) {
@@ -11,12 +19,15 @@ async function createItem(data) {
         name: data.name,
         completed: false,
     };
+    await publishEvent(EVENTS.TASK_CREATED, item);
 
     return itemRepository.create(item);
 }
 
 async function deleteItem(id) {
-    return itemRepository.deleteById(id);
+    const rep = itemRepository.deleteById(id);
+    await publishEvent(EVENTS.TASK_DELETED, { id });
+    return rep;
 }
 
 async function updateItem(id, data) {
@@ -27,11 +38,14 @@ async function updateItem(id, data) {
 
     await itemRepository.updateById(id, item);
 
+    await publishEvent(EVENTS.TASK_UPDATED, { id, ...item });
+
     return itemRepository.getById(id);
 }
 
 module.exports = {
     getItems,
+    getItem,
     createItem,
     deleteItem,
     updateItem,

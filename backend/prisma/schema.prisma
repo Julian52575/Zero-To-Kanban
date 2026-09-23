@@ -14,3 +14,16 @@ model TodoItem {
 
   @@map("todo_items")
 }
+
+model Project {
+  id        String  @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  @@map("projects")
+}
+
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}

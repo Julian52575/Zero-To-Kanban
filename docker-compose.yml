@@ -30,7 +30,7 @@ services:
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --api.dashboard=true
-      - --api.insecure=true        # dashboard on :8080 with no auth -- dev only
+      - --api.insecure=true # dashboard on :8080 with no auth -- dev only
       - --accesslog=true
     ports:
       - "${PROXY_PORT:-8000}:80"
@@ -123,6 +123,29 @@ services:
       retries: 3
       start_period: 5s
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    # Run as the image's own `rabbitmq` user for the whole container lifetime
+    user: rabbitmq
+    volumes:
+      # `:U` chowns the volume to the container's uid (rabbitmq) on start.
+      # Needed because we bypass the entrypoint's own root->rabbitmq chown
+      # step by never starting as root (see `user:` above), so nothing else
+      # would make a fresh volume writable by the non-root rabbitmq user.
+      - rabbitmq-data:/var/lib/rabbitmq:U
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 1s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+
   backend:
     #image: ghcr.io/julian52575/zero-to-kanban-backend:manual-test #latest
     build:
@@ -130,8 +153,14 @@ services:
       dockerfile: Dev.Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}?schema=public
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
     depends_on:
       db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       auth:
         condition: service_started
@@ -157,8 +186,11 @@ services:
       - traefik.http.middlewares.strip-identity.headers.customRequestHeaders.X-Auth-User-Id=
       - traefik.http.middlewares.strip-identity.headers.customRequestHeaders.X-Auth-User-Name=
 
-      - traefik.http.routers.backend.rule=PathPrefix(`/items`)
+      - traefik.http.middlewares.backend-stripprefix.stripprefix.prefixes=/api
+
+      - traefik.http.routers.backend.rule=PathPrefix(`/api`)
       - traefik.http.routers.backend.priority=10
+      - traefik.http.routers.backend.middlewares=strip-identity@docker,require-login@docker,backend-stripprefix
       - traefik.http.services.backend.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
@@ -173,6 +205,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dev.Dockerfile
+    environment:
+      VITE_BACKEND_URL: http://backend:3000
     depends_on:
       backend:
         condition: service_healthy
@@ -188,3 +222,4 @@ services:
 volumes:
   todo-db-data:
   auth-db-data:
+  rabbitmq-data:
