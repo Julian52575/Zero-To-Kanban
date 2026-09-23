@@ -16,6 +16,13 @@ backend:
   image:
     tag: latest
   replicaCount: 4
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 
 auth:
   image:
@@ -23,11 +30,25 @@ auth:
   replicaCount: 2
   cookieSecure: "true"
   existingSecret: zero-to-kanban-prod-auth
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 frontend:
   image:
     tag: latest
   replicaCount: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
 
 ingress:
   entryPoints:
