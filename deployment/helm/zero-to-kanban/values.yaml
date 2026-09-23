@@ -100,12 +100,18 @@ postgresql:
     # below (fine for disposable dev environments; never set this in
     # values-prod.yaml -- use existingSecret there instead).
     password: todo
+    # `postgres` superuser, kept so pg_dump/admin access has a known
+    # password. Same plaintext-fallback rule as `password` above.
+    enablePostgresUser: true
+    postgresPassword: postgres
     # Pre-created Secret holding the Postgres passwords, see
-    # deployment/README.md. When set, `password` above is ignored and the
-    # bitnami subchart won't generate its own Secret.
+    # deployment/README.md. When set, `password` and `postgresPassword`
+    # above are ignored and the bitnami subchart won't generate its own
+    # Secret.
     existingSecret: ""
     secretKeys:
       userPasswordKey: password
+      adminPasswordKey: postgres-password
   primary:
     persistence:
       enabled: true
@@ -119,9 +125,12 @@ authdb:
     username: authuser
     database: auth
     password: authpass
+    enablePostgresUser: true
+    postgresPassword: postgres
     existingSecret: ""
     secretKeys:
       userPasswordKey: password
+      adminPasswordKey: postgres-password
   primary:
     persistence:
       enabled: true

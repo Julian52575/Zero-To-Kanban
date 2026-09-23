@@ -132,13 +132,27 @@ clusters only:
 | What                      | Value                                   |
 |---------------------------|-----------------------------------------|
 | `/metrics` BasicAuth      | `metrics` / `dev-only-change-me`, e.g. `curl -u metrics:dev-only-change-me http://localhost:18080/metrics` |
-| app DB (`postgresql`)     | user `todo`, password `todo`, database `todo` |
-| auth DB (`authdb`)        | user `authuser`, password `authpass`, database `auth` |
+| app DB (`postgresql`)     | user `todo`, password `todo`, database `todo`; superuser `postgres` / `postgres` |
+| auth DB (`authdb`)        | user `authuser`, password `authpass`, database `auth`; superuser `postgres` / `postgres` |
 | session signing key       | `dev-only-change-me`                    |
 
 The `/metrics` Secret stores only a bcrypt hash, so the password can't be
 read back from the cluster. Get it from `values.yaml` in dev, or from
 whoever created the Secret in prod.
+
+**Database dumps:** run `pg_dump` inside the database pod as the `postgres`
+superuser. No local Postgres client is needed:
+
+```bash
+kubectl -n ztk-dev-k3s exec ztk-dev-k3s-local-postgresql-0 -- \
+  env PGPASSWORD=postgres pg_dump -h 127.0.0.1 -U postgres todo > todo.sql
+kubectl -n ztk-dev-k3s exec ztk-dev-k3s-local-authdb-0 -- \
+  env PGPASSWORD=postgres pg_dump -h 127.0.0.1 -U postgres auth > auth.sql
+```
+
+In prod, read the password from the `postgres-password` key of the
+database's Secret. A database only takes its passwords when its volume is
+first created. On an older dev volume, run `just nuke` to reset them.
 
 **Values files:** `values.yaml` holds the defaults. `values-dev.yaml` or
 `values-prod.yaml` is layered on top of it.
@@ -185,7 +199,7 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
    kubectl create namespace ztk-prod
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-auth \
      --from-literal=session-secret="$(openssl rand -hex 32)"
-   # the Bitnami chart reads both keys: the app user and the `postgres` superuser
+   # password = app user, postgres-password = `postgres` superuser (pg_dump, admin)
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-postgresql \
      --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-authdb \
