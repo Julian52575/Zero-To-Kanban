@@ -1,7 +1,7 @@
 # App stack: a Traefik reverse proxy in front of a split React/Express app.
 #
 #   http://localhost:8000/           -> frontend (Vite dev server, ./frontend)
-#   http://localhost:8000/items      -> backend  (Express API, ./backend)
+#   http://localhost:8000/api/items      -> backend  (Express API, ./backend)
 #   http://localhost:8000/login      -> auth     (username-only sign-in page, ./auth)
 #   http://localhost:8000/auth/*     -> auth     (login, logout, logout-all, me)
 #   http://localhost:8080/           -> Traefik dashboard (insecure, local only)
@@ -155,8 +155,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}?schema=public
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
     depends_on:
       db:
         condition: service_healthy
