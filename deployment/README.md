@@ -184,7 +184,7 @@ first created. On an older dev volume, run `just nuke` to reset them.
 |------------------------|--------------------------------------|-----------------------------------------|
 | image tag / pull       | `manual-test`, `Always`              | release tag bumped on each release, `IfNotPresent` |
 | replicas (be/auth/fe)  | 1 / 1 / 1                            | 4 / 2 / 2                               |
-| frontend               | Vite dev server (1Gi limit)          | static bundle                           |
+| frontend memory limit  | 1Gi                                  | 128Mi                                   |
 | secrets                | plaintext defaults in `values.yaml`  | pre-created Secrets (`existingSecret`)  |
 | entrypoint / TLS       | `web`, no TLS                        | `websecure`, TLS from Secret `kanban-tls` |
 | `/metrics` route       | on                                   | off                                     |
