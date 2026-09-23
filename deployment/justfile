@@ -18,6 +18,12 @@ alertmanager_pf_unit := "zero-to-kanban-alertmanager-pf"
 # see argocd/environments/monitoring-k3s-app.yaml's metadata.name.
 alertmanager_svc := "ztk-monitoring-k3s-alertmanager"
 
+# Argo CD release installed by up-local/up-gitops and removed by rm. Pinned
+# so every machine gets the same version and rm deletes exactly what was
+# installed. Bump it, then `just rm` + `just up-local` to upgrade.
+argocd_version := "v3.5.3"
+argocd_manifest := "https://raw.githubusercontent.com/argoproj/argo-cd/" + argocd_version + "/manifests/install.yaml"
+
 deploy_dir := justfile_directory()
 repo_root := parent_directory(deploy_dir)
 # Kept outside deploy_dir -- see the STATE_DIR comment in flake.nix
@@ -82,14 +88,14 @@ _argocd-base:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! kubectl get namespace argocd >/dev/null 2>&1; then
-        echo "argocd: installing into the cluster (first run only)..."
+        echo "argocd: installing {{argocd_version}} into the cluster (first run only)..."
         kubectl create namespace argocd
         # --server-side: the applicationsets.argoproj.io CRD's schema is big
         # enough that client-side `kubectl apply`'s last-applied-configuration
         # annotation blows past Kubernetes' 262144-byte annotation limit.
         # Server-side apply tracks field ownership on the API server instead,
         # so it doesn't need that annotation at all.
-        kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        kubectl apply --server-side -n argocd -f {{argocd_manifest}}
         kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server \
           || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
     fi
@@ -158,7 +164,7 @@ rm: _k3s-ready
     # orphaned in the cluster. --all instead of naming each one so this
     # doesn't need updating every time an Application is added.
     kubectl -n argocd delete application --all --wait --timeout=120s
-    kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --ignore-not-found
+    kubectl delete -n argocd -f {{argocd_manifest}} --ignore-not-found
     kubectl delete namespace argocd --ignore-not-found
     # *-pf.scope also matches traefik's forward -- Traefik is k3s's own
     # bundled ingress, not something Argo CD manages, so it stays up
