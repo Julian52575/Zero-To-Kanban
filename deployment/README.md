@@ -231,41 +231,127 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 ## Shared / production cluster
 
 1. Install Argo CD in the cluster.
-2. Create the prod Secrets in `ztk-prod`. `values-prod.yaml` only names
-   them, so Argo CD never sees the values. Sealed Secrets or the External
-   Secrets Operator can create them instead of `kubectl`.
+2. Create the prod Secrets in `ztk-prod`, before the first sync.
+   `values-prod.yaml` only names them, so Argo CD never sees the values.
+   Sealed Secrets or the External Secrets Operator can create them instead
+   of `kubectl`. Every password is generated with `openssl rand -hex`, so
+   there is nothing to invent: the database and RabbitMQ passwords are put
+   into connection URLs (`postgresql://user:password@host`) without escaping,
+   and a `@`, `/` or `:` in them would break the connection.
 
    ```bash
    kubectl create namespace ztk-prod
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-auth \
      --from-literal=session-secret="$(openssl rand -hex 32)"
-   # password = app user, postgres-password = `postgres` superuser (pg_dump, admin)
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-postgresql \
-     --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
+     --from-literal=password="$(openssl rand -hex 32)" \
+     --from-literal=postgres-password="$(openssl rand -hex 32)"
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-authdb \
-     --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
-   # hex only: the backend puts it into an amqp:// URL without escaping it
+     --from-literal=password="$(openssl rand -hex 32)" \
+     --from-literal=postgres-password="$(openssl rand -hex 32)"
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-rabbitmq \
      --from-literal=password="$(openssl rand -hex 32)"
-   kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
    ```
 
-   `/metrics` is off in prod. To turn it on, set `ingress.metrics.enabled: true`
-   and `ingress.metrics.auth.existingSecret: zero-to-kanban-prod-metrics-auth`,
-   then create that Secret. It holds an htpasswd file under the key `users`:
+   Each database Secret holds two passwords, one per Postgres account:
+
+   | Key                 | Account                                   | Used by                  |
+   |---------------------|-------------------------------------------|--------------------------|
+   | `password`          | app user (`todo`, or `authuser` for authdb) | backend / auth, at runtime |
+   | `postgres-password` | `postgres` superuser                      | you: `pg_dump`, admin    |
+
+   No need to write them down. Read one back with:
 
    ```bash
-   htpasswd -nBC 10 metrics | kubectl -n ztk-prod create secret generic \
-     zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
+   kubectl -n ztk-prod get secret zero-to-kanban-prod-postgresql \
+     -o jsonpath='{.data.postgres-password}' | base64 -d; echo
    ```
 
-3. Apply the root app once. It then creates and manages `ztk-dev` and `ztk-prod`:
+   A database only takes its passwords when its volume is first created.
+   Editing the Secret afterwards does not change them.
+
+3. Create the TLS certificate, as a `kubernetes.io/tls` Secret named
+   `kanban-tls` in `ztk-prod`. Pick one:
+
+   - **With a domain name (recommended):** cert-manager gets a free Let's
+     Encrypt certificate and renews it. Point the domain's DNS `A` record at
+     the server, and make sure ports 80 and 443 are open, then:
+
+     ```bash
+     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+     kubectl -n cert-manager rollout status deploy/cert-manager-webhook
+
+     # replace the email and the domain
+     kubectl apply -f - <<'EOF'
+     apiVersion: cert-manager.io/v1
+     kind: ClusterIssuer
+     metadata:
+       name: letsencrypt
+     spec:
+       acme:
+         server: https://acme-v02.api.letsencrypt.org/directory
+         email: you@example.com
+         privateKeySecretRef:
+           name: letsencrypt-account-key
+         solvers:
+           - http01:
+               ingress:
+                 ingressClassName: traefik
+     ---
+     apiVersion: cert-manager.io/v1
+     kind: Certificate
+     metadata:
+       name: kanban-tls
+       namespace: ztk-prod
+     spec:
+       secretName: kanban-tls
+       dnsNames:
+         - kanban.example.com
+       issuerRef:
+         name: letsencrypt
+         kind: ClusterIssuer
+     EOF
+
+     kubectl -n ztk-prod get certificate kanban-tls   # wait for READY=True
+     ```
+
+     If it stays `False`, `kubectl -n ztk-prod describe certificate kanban-tls`
+     says why (usually DNS not pointing at the server yet, or port 80 closed).
+
+   - **Without a domain (IP only):** a self-signed certificate. HTTPS works,
+     but browsers show a warning you have to click through.
+
+     ```bash
+     openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+       -subj "/CN=kanban" -keyout tls.key -out tls.crt
+     kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
+     rm tls.key tls.crt
+     ```
+
+   - **You already have `tls.crt` / `tls.key`** (from your DNS or hosting
+     provider): run only the `kubectl ... create secret tls` line above, from
+     the directory holding them.
+
+4. *(Optional)* `/metrics` is off in prod. To turn it on, set
+   `ingress.metrics.enabled: true` and
+   `ingress.metrics.auth.existingSecret: zero-to-kanban-prod-metrics-auth`,
+   then create that Secret. It holds an htpasswd line under the key `users`.
+   `htpasswd` comes from `apache2-utils` (`sudo apt install apache2-utils`):
+
+   ```bash
+   METRICS_PASSWORD="$(openssl rand -hex 16)"
+   echo "metrics password: $METRICS_PASSWORD"   # save it, it can't be read back
+   htpasswd -nbB metrics "$METRICS_PASSWORD" | kubectl -n ztk-prod create secret \
+     generic zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
+   ```
+
+5. Apply the root app once. It then creates and manages `ztk-dev` and `ztk-prod`:
 
    ```bash
    kubectl apply -n argocd -f argocd/root-app.yaml
    ```
 
-4. **Release to prod:** each GitHub release publishes new images, then
+6. **Release to prod:** each GitHub release publishes new images, then
    `.github/workflows/bump-helm-chart.yml` writes the release tag into
    `values-prod.yaml`, deploys the chart with the prod values into a
    throwaway k3s node, and opens a PR if it becomes ready. Merge the PR, then
