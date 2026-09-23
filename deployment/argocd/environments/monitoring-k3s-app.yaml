@@ -26,10 +26,8 @@
 # deployment/helm/zero-to-kanban/templates/ingressroute.yaml exposes
 # externally at /metrics for out-of-cluster access).
 #
-# Applied directly, same as dev-k3s-app.yaml -- not discovered through
-# root-app.yaml (which is for a shared/remote root, and explicitly targets
-# this repo's real chart, not upstream ones):
-#   export KUBECONFIG=deployment/k3s.yaml
+# Applied directly, from inside `nix develop ./deployment` (which exports
+# KUBECONFIG) -- not discovered through root-app.yaml, which excludes it:
 #   kubectl apply -n argocd -f deployment/argocd/environments/monitoring-k3s-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
