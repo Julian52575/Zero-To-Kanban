@@ -11,7 +11,7 @@
 # is off (emptyDir) -- fine for a disposable local cluster, revisit before
 # this is reused anywhere data should survive a pod restart.
 #
-# Alertmanager's receiver is a deliberate no-op for now ("rtk-null",
+# Alertmanager's receiver is a deliberate no-op for now ("discard-all-alerts",
 # no *_configs at all) -- there's no real notification target (Slack
 # webhook, ntfy, ...) wired up yet, and one shouldn't be invented here.
 # Point `alertmanager.config.receivers` at a real one when you have it;
@@ -57,12 +57,12 @@ spec:
             enabled: false
           config:
             route:
-              receiver: rtk-null
+              receiver: discard-all-alerts
               group_wait: 30s
               group_interval: 5m
               repeat_interval: 3h
             receivers:
-              - name: rtk-null
+              - name: discard-all-alerts
         serverFiles:
           alerting_rules.yml:
             groups: []
