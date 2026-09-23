@@ -126,6 +126,13 @@ with no hostname. It is the same routing as `docker-compose.yml`:
 On protected routes, client-sent `X-Auth-User-*` headers are removed. The
 auth service then sets them after it checks the session.
 
+**Network policies** make Traefik the only way in: auth, backend and
+frontend accept traffic only from the Traefik pods, `postgresql` only from
+backend, and `authdb` only from auth. The one exception is frontend →
+backend, for the startup wait. Kubelet probes, `kubectl exec` and
+`kubectl port-forward` still work. If Traefik runs somewhere other than
+k3s's `kube-system`, set `networkPolicy.ingressController`.
+
 **Dev credentials** are plaintext defaults in `values.yaml`, for disposable
 clusters only:
 

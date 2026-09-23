@@ -89,6 +89,17 @@ ingress:
     enabled: false
     secretName: ""
 
+# NetworkPolicies (templates/networkpolicy.yaml): auth/backend/frontend
+# only accept traffic from the ingress controller, each database only from
+# its own service. Point ingressController at wherever Traefik runs (k3s
+# ships it in kube-system).
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik
+
 # Bitnami postgresql subchart config. See:
 # https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 postgresql:
@@ -116,6 +127,11 @@ postgresql:
     persistence:
       enabled: true
       size: 1Gi
+    # The subchart's own policy allows any pod in (allowExternal: true);
+    # NetworkPolicies add up, so it would cancel ours. networkPolicy above
+    # replaces it.
+    networkPolicy:
+      enabled: false
 
 # Dedicated Postgres for the auth service (alias of the bitnami subchart):
 # separate credentials, storage and blast radius from the app DB above.
@@ -135,3 +151,6 @@ authdb:
     persistence:
       enabled: true
       size: 1Gi
+    # See postgresql.primary.networkPolicy above.
+    networkPolicy:
+      enabled: false
