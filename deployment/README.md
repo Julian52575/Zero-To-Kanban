@@ -230,7 +230,24 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 
 ## Shared / production cluster
 
-1. Install Argo CD in the cluster.
+1. Install Argo CD in the cluster, at the version the `justfile` pins
+   (`argocd_version`). Until this is done, applying any Argo CD file fails
+   with `no matches for kind "Application"`.
+
+   ```bash
+   kubectl create namespace argocd
+   # --server-side: the ApplicationSet CRD is too big for client-side apply
+   kubectl apply --server-side -n argocd \
+     -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.3/manifests/install.yaml
+   kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server
+   ```
+
+   The UI isn't exposed publicly. From your own machine, tunnel to it with
+   `ssh -L 8081:localhost:8081 <vps>`, run
+   `kubectl -n argocd port-forward svc/argocd-server 8081:443` on the VPS,
+   then open https://localhost:8081. Log in as `admin` with the password
+   from `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`.
+
 2. Create the prod Secrets in `ztk-prod`, before the first sync.
    `values-prod.yaml` only names them, so Argo CD never sees the values.
    Sealed Secrets or the External Secrets Operator can create them instead
