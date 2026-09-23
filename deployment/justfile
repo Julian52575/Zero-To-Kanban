@@ -4,8 +4,6 @@ set shell := ["bash", "-eu", "-c"]
 default:
     @just --list
 
-k3s_unit := "zero-to-kanban-k3s"
-
 # Local ports auto-bound by up-local/up-gitops (see the _bind-* recipes
 # below) and the systemd --user scope name backing each one's background
 # port-forward. Named here once so a port change can't drift out of sync
@@ -154,32 +152,49 @@ rm: _k3s-ready
         echo "argocd: namespace not present, nothing to remove"
         exit 0
     fi
-    # Delete the Applications first (and wait for it) so their managed
+    # Delete every Application first (and wait for it) so their managed
     # resources get pruned by the controller before it disappears --
-    # otherwise deleting the argocd namespace outright would leave
-    # ztk-dev-k3s's resources orphaned in the cluster.
-    kubectl -n argocd delete application ztk-dev-k3s ztk-dev-k3s-local \
-      --ignore-not-found --wait --timeout=120s
+    # otherwise deleting the argocd namespace outright would leave them
+    # orphaned in the cluster. --all instead of naming each one so this
+    # doesn't need updating every time an Application is added.
+    kubectl -n argocd delete application --all --wait --timeout=120s
     kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --ignore-not-found
     kubectl delete namespace argocd --ignore-not-found
-    if systemctl --user is-active --quiet "{{argocd_pf_unit}}.scope" 2>/dev/null; then
-        echo "+ systemctl --user stop {{argocd_pf_unit}}.scope (argocd-server is gone, forward would just error)"
-        systemctl --user stop "{{argocd_pf_unit}}.scope"
-    fi
+    # *-pf.scope also matches traefik's forward -- Traefik is k3s's own
+    # bundled ingress, not something Argo CD manages, so it stays up
+    # (unlike down/nuke, which mean to stop everything and exclude nothing).
+    units=$(systemctl --user list-units --plain --no-legend "zero-to-kanban-*-pf.scope" 2>/dev/null \
+      | awk '{print $1}' | grep -v -F "{{traefik_pf_unit}}.scope" || true)
+    for u in $units; do
+        echo "+ systemctl --user stop $u (its Application is gone, forward would just error)"
+        systemctl --user stop "$u"
+    done
     echo "argocd: removed from the cluster -- 'just up-local'/'just up-gitops' to reinstall"
 
-# Stop the rootless k3s node and delete all its state (Argo CD, Postgres data, everything)
-nuke:
+# (internal) stop every active systemd --user scope matching a glob (as
+# `systemctl --user list-units` sees it). Discovers units by pattern
+# instead of a hardcoded list, so a newly added port-forward or service
+# is covered here without this file needing to know its name.
+_stop-units-matching pattern:
     #!/usr/bin/env bash
     set -euo pipefail
-    for u in "{{k3s_unit}}" "{{traefik_pf_unit}}" "{{argocd_pf_unit}}" "{{alertmanager_pf_unit}}"; do
-        if systemctl --user is-active --quiet "$u.scope" 2>/dev/null; then
-            echo "+ systemctl --user stop $u.scope"
-            systemctl --user stop "$u.scope"
-        else
-            echo "$u.scope not active, nothing to stop"
-        fi
+    units=$(systemctl --user list-units --plain --no-legend "{{pattern}}" 2>/dev/null | awk '{print $1}')
+    if [ -z "$units" ]; then
+        echo "no active units matching {{pattern}}"
+        exit 0
+    fi
+    for u in $units; do
+        echo "+ systemctl --user stop $u"
+        systemctl --user stop "$u"
     done
+
+# Stop the rootless k3s node and its port-forwards; data on disk (Argo CD, Postgres, everything) is kept for next 'just up-local'/'up-gitops'
+down: (_stop-units-matching "zero-to-kanban-*.scope")
+
+# Stop the rootless k3s node and delete all its state (Argo CD, Postgres data, everything)
+nuke: (_stop-units-matching "zero-to-kanban-*.scope")
+    #!/usr/bin/env bash
+    set -euo pipefail
     if [ -d "{{data_dir}}" ]; then
         echo "+ rootlesskit rm -rf {{data_dir}}"
         # containerd's overlayfs snapshots are owned by uids remapped
