@@ -40,7 +40,11 @@ async function updateProject(req, res) {
     );
 
     try {
-        await publishEvent(EVENTS.PROJECT_UPDATED, project);
+        await publishEvent(EVENTS.PROJECT_UPDATED, {
+            id: req.params.id,
+            beforeUpdate: project,
+            afterUpdate: req.body,
+        });
     } catch (error) {
         console.error('Failed to publish PROJECT_UPDATED event:', error);
     }

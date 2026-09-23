@@ -1,12 +1,16 @@
 const { z } = require("zod");
 
 const projectCreatedSchema = z.object({
-    projectId: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
-    priority: z.number(),
-    deadline: z.string().nullable(),
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  createdAt: z
+    .string()
+    .refine((date) => !isNaN(Date.parse(date)), {
+      message: "Invalid date format",
+    })
+    .optional(),
+  ownerId: z.string().uuid(),
+  columns: z.array(z.object({})),
 });
 
 module.exports = projectCreatedSchema;

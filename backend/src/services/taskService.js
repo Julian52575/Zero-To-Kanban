@@ -1,6 +1,4 @@
 const taskRepository = require("../repositories/taskRepository");
-const { publishEvent } = require("../events/eventBus");
-const { EVENTS } = require("../events/events");
 const { userCanAccessProject } = require("../persistence");
 
 async function getTasks(projectId) {
@@ -13,11 +11,6 @@ async function getTask(id) {
 
 async function createTask(columnId, creatorId, taskData) {
   const response = await taskRepository.create(columnId, creatorId, taskData);
-  try {
-    await publishEvent(EVENTS.TASK_CREATED, response);
-  } catch (error) {
-    console.error("Error publishing task created event:", error);
-  }
   return response;
 }
 
