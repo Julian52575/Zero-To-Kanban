@@ -1,12 +1,14 @@
 const { z } = require("zod");
 
-const taskCreatedSchema = z.object({
-    taskId: z.string(),
-    projectId: z.string(),
-    name: z.string(),
-    status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
-    priority: z.number(),
-    deadline: z.string().nullable(),
-});
+const taskCreatedSchema = z
+    .object({
+        taskId: z.string(),
+        projectId: z.string(),
+        name: z.string(),
+        status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
+        priority: z.number(),
+        deadline: z.string().nullable(),
+    })
+    .strict();
 
 module.exports = taskCreatedSchema;
