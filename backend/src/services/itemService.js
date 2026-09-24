@@ -6,10 +6,6 @@ const { EVENTS } = require("../events/events");
 const { taskPayload } = require("../events/payloads");
 
 
-const { publishEvent } = require('../events/eventBus');
-const { EVENTS } = require("../events/events");
-
-
 async function getItems() {
     return itemRepository.getAll();
 }
