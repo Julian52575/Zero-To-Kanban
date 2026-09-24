@@ -15,6 +15,7 @@ async function getTask(req, res) {
 async function createTask(req, res) {
   const task = await taskService.createTask(req.body);
 
+  
   res.status(201).json(task);
 }
 
@@ -24,11 +25,15 @@ async function updateTask(req, res) {
     req.body
   );
 
+  publishEvent(EVENTS.TASK_UPDATED, task);
+
   res.json(task);
 }
 
 async function deleteTask(req, res) {
   await taskService.deleteTask(req.params.id);
+
+  publishEvent(EVENTS.TASK_DELETED, { id: req.params.id });
 
   res.status(200).end();
 }

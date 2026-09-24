@@ -1,10 +1,14 @@
 const { z } = require("zod");
 
-// Mirrors the TodoItem model; extend alongside it.
-const taskCreatedSchema = z.object({
-    taskId: z.string(),
-    name: z.string(),
-    completed: z.boolean(),
-});
+const taskCreatedSchema = z
+    .object({
+        taskId: z.string(),
+        projectId: z.string(),
+        name: z.string(),
+        status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
+        priority: z.number(),
+        deadline: z.string().nullable(),
+    })
+    .strict();
 
 module.exports = taskCreatedSchema;

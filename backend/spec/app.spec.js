@@ -9,6 +9,10 @@ jest.mock('../src/events/eventBus', () => ({
     publishEvent: jest.fn(),
 }));
 
+jest.mock('../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
 jest.mock('../src/repositories/itemRepository', () => ({
     getAll: jest.fn(),
     create: jest.fn(),

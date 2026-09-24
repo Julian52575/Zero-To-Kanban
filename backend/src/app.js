@@ -44,4 +44,15 @@ apiRouter.patch('/projects/:id', updateProject);
 
 app.use(apiRouter);
 
+app.get('/projects', getProjects);
+app.get('/projects/:id', getProject);
+console.log('validateCreateProject:', typeof validateCreateProject);
+console.log('createProject:', typeof createProject);
+console.log('createProject value:', createProject);
+app.post('/projects', validateCreateProject, createProject);
+app.delete('/projects/:id', deleteProject);
+app.put('/projects/:id', updateProject);
+app.patch('/projects/:id', updateProject);
+
+
 module.exports = app;

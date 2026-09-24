@@ -1,3 +1,4 @@
+jest.mock('../../src/events/eventBus');
 jest.mock('../../src/services/taskService', () => ({
     getTasks: jest.fn(),
     getTask: jest.fn(),
