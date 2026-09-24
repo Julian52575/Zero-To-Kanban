@@ -5,11 +5,6 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    // Prefer TS/TSX over the stale, superseded .jsx/.js duplicates left in
-    // src/ and components/ -- see frontend cleanup notes.
-    extensions: ['.tsx', '.ts', '.mjs', '.js', '.jsx', '.json'],
-  },
   server: {
     proxy: {
       // Defaults to a locally-run backend. Set VITE_BACKEND_URL to the
