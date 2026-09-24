@@ -7,7 +7,7 @@ jest.mock('../../src/repositories/itemRepository', () => ({
 }));
 
 const itemRepository = require('../../src/repositories/itemRepository');
-const getItems = require('../../src/routes/getItems');
+const getItems = require('../../src/routes/item/getItems');
 
 const ITEMS = [{ id: 12345 }];
 

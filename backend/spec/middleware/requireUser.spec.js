@@ -1,4 +1,4 @@
-const requireUser = require('../../src/middleware/requireUser');
+const requireUser = require('../../src/middlewares/requireUser');
 
 const mockRes = () => {
     const res = {};

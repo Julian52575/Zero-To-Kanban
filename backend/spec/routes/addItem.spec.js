@@ -11,7 +11,7 @@ jest.mock('../../src/events/eventBus', () => ({
 }));
 
 const itemRepository = require('../../src/repositories/itemRepository');
-const addItem = require('../../src/routes/addItem');
+const addItem = require('../../src/routes/item/addItem');
 
 test('it stores item correctly', async () => {
     const id = 'something-not-a-uuid';

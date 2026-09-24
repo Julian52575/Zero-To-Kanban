@@ -11,7 +11,7 @@ jest.mock('../../src/events/eventBus', () => ({
 }));
 
 const itemRepository = require('../../src/repositories/itemRepository');
-const deleteItem = require('../../src/routes/deleteItem');
+const deleteItem = require('../../src/routes/item/deleteItem');
 
 test('it removes item correctly', async () => {
     const req = {

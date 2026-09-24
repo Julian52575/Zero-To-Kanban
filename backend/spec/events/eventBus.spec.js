@@ -1,7 +1,27 @@
-const {
-  connectRabbitMQ,
-  closeRabbitMQ,
-} = require("../../src/events/rabbitmq");
+jest.mock("../../src/events/rabbitmq", () => ({
+  getChannel: jest.fn(),
+}));
+
+jest.mock("../../src/persistence", () => ({
+  prisma: {
+    $transaction: jest.fn(async (callback) => {
+      const tx = {
+        processedEvent: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      return callback(tx);
+    }),
+  },
+}));
+
+jest.mock("uuid", () => ({
+  v4: jest.fn(() => "123e4567-e89b-12d3-a456-426614174000"),
+}));
+
+const { getChannel } = require("../../src/events/rabbitmq");
 
 const {
   publishEvent,
@@ -11,21 +31,46 @@ const {
 const { EVENTS } = require("../../src/events/events");
 
 describe("EventBus", () => {
-  beforeAll(async () => {
-    await connectRabbitMQ(5672);
+  let channel;
+  let consumeHandler;
+
+  beforeEach(() => {
+    consumeHandler = null;
+
+    channel = {
+      assertQueue: jest.fn().mockResolvedValue({}),
+      bindQueue: jest.fn().mockResolvedValue({}),
+
+      consume: jest.fn().mockImplementation(async (queueName, handler) => {
+        consumeHandler = handler;
+      }),
+
+      publish: jest.fn(),
+      sendToQueue: jest.fn(),
+
+      ack: jest.fn(),
+
+      waitForConfirms: jest.fn().mockResolvedValue({}),
+    };
+
+    getChannel.mockReturnValue(channel);
   });
 
-  afterAll(async () => {
-    await closeRabbitMQ();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   test("should publish and consume a TASK_CREATED event", async () => {
     const data = {
-      taskId: 123,
+      taskId: "task-123",
+      projectId: "project-123",
       name: "Test task",
+      status: "TODO",
+      priority: 1,
+      deadline: null,
     };
 
-    const handler = jest.fn();
+    const handler = jest.fn().mockResolvedValue(undefined);
 
     const queueName = "test-task-created";
 
@@ -40,9 +85,19 @@ describe("EventBus", () => {
       data
     );
 
-    // Laisser RabbitMQ transmettre le message
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const publishedMessage = channel.publish.mock.calls[0][2];
 
-    expect(handler).toHaveBeenCalledWith(data);
+    await consumeHandler({
+      content: publishedMessage,
+      properties: {
+        headers: {},
+      },
+    });
+
+    expect(handler).toHaveBeenCalledWith(
+      data,
+      "123e4567-e89b-12d3-a456-426614174000",
+      expect.any(Object)
+    );
   });
 });
