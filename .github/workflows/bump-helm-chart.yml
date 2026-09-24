@@ -111,6 +111,7 @@ jobs:
         env:
           TAG: ${{ needs.bump-chart.outputs.tag }}
         run: |
+          # shellcheck disable=SC2016 # expanded by the inner bash, not here
           nix develop ./deployment --command bash -euo pipefail -c '
             kubectl create namespace ztk-smoke
 
