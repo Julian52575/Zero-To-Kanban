@@ -1,11 +1,12 @@
 const projectService = require('../services/projectService');
 const { EVENTS } = require("../events/events");
 const { publishEvent } = require("../events/eventBus");
+const { projectPayload } = require("../events/payloads");
 
 async function createProject(req, res) {
     const project = await projectService.createProject(req.body);
 
-    publishEvent(EVENTS.PROJECT_CREATED, project);
+    await publishEvent(EVENTS.PROJECT_CREATED, projectPayload(project));
 
     res.status(201).json(project);
 }
@@ -33,7 +34,7 @@ async function updateProject(req, res) {
         req.body
     );
 
-    publishEvent(EVENTS.PROJECT_UPDATED, project);
+    await publishEvent(EVENTS.PROJECT_UPDATED, projectPayload(project));
 
     res.json(project);
 }
@@ -41,7 +42,7 @@ async function updateProject(req, res) {
 async function deleteProject(req, res) {
     await projectService.deleteProject(req.params.id);
 
-    publishEvent(EVENTS.PROJECT_DELETED, { id: req.params.id });
+    await publishEvent(EVENTS.PROJECT_DELETED, { projectId: req.params.id });
 
     res.status(200).end();
 }

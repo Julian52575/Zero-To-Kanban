@@ -5,9 +5,6 @@ jest.mock('../../src/services/taskService', () => ({
     updateTask: jest.fn(),
     deleteTask: jest.fn(),
 }));
-jest.mock('../../src/events/eventBus', () => ({
-    publishEvent: jest.fn(),
-}));
 
 const taskService = require('../../src/services/taskService');
 const taskController = require('../../src/controllers/taskController');

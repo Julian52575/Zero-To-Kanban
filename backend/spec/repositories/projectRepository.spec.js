@@ -80,4 +80,32 @@ describe('projectRepository', () => {
             expect(result).toBeNull();
         });
     });
+
+    describe('update', () => {
+        it('should update a project', async () => {
+            const project = {
+                id: 'project-id',
+                name: 'Nouveau nom',
+            };
+
+            db.updateProject.mockResolvedValue(project);
+
+            const result = await projectRepository.update(project);
+
+            expect(db.updateProject).toHaveBeenCalledWith(project);
+            expect(result).toEqual(project);
+        });
+    });
+
+    describe('delete', () => {
+        it('should delete a project by its id', async () => {
+            db.removeProject.mockResolvedValue();
+
+            await projectRepository.delete('project-id');
+
+            expect(db.removeProject).toHaveBeenCalledWith(
+                'project-id'
+            );
+        });
+    });
 });
