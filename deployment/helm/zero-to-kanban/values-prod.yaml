@@ -11,7 +11,7 @@
 backend:
   image:
     tag: manual-test
-  replicaCount: 4
+  replicaCount: 1
   resources:
     requests:
       cpu: 100m
@@ -23,7 +23,7 @@ backend:
 auth:
   image:
     tag: manual-test
-  replicaCount: 2
+  replicaCount: 1
   cookieSecure: "true"
   existingSecret: zero-to-kanban-prod-auth
   resources:
@@ -37,7 +37,7 @@ auth:
 frontend:
   image:
     tag: manual-test
-  replicaCount: 2
+  replicaCount: 1
   resources:
     requests:
       cpu: 50m
