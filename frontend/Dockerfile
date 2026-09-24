@@ -8,8 +8,12 @@
 
 FROM node:24-slim AS build
 WORKDIR /app
+
 COPY package.json package-lock.json ./
-RUN npm ci
+
+RUN npm ci \
+ && npm i -g serve
+
 COPY . .
 RUN npm run build
 

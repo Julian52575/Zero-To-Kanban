@@ -11,6 +11,10 @@ async function getItem(id) {
   return itemRepository.getById(id);
 }
 
+async function getItem(id) {
+    return itemRepository.getById(id);
+}
+
 async function createItem(data) {
   const item = {
     id: uuid(),

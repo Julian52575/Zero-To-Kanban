@@ -1,6 +1,6 @@
 const { getChannel } = require("./rabbitmq");
 const { EVENT_SCHEMAS } = require("./events");
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID: uuidv4 } = require("crypto");
 const { prisma } = require("../persistence");
 const { z } = require("zod");
 

@@ -1,3 +1,20 @@
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
+jest.mock('../../src/repositories/projectRepository', () => {
+    const mockProjects = new Map();
+
+    return {
+        create: jest.fn(async (project) => {
+            mockProjects.set(project.id, project);
+            return project;
+        }),
+        getAll: jest.fn(async () => [...mockProjects.values()]),
+        getById: jest.fn(async (id) => mockProjects.get(id) ?? null),
+    };
+});
+
 const request = require('supertest');
 const app = require('../../src/app');
 

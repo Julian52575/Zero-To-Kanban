@@ -1,11 +1,11 @@
 const amqp = require("amqplib");
 
-// `||` rather than destructuring defaults: compose passes unset vars through
-// as empty strings, which destructuring defaults would not replace.
-const RABBITMQ_USER = process.env.RABBITMQ_USER || "guest";
-const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || "guest";
-const RABBITMQ_HOST = process.env.RABBITMQ_HOST || "localhost";
-const RABBITMQ_PORT = process.env.RABBITMQ_PORT || 5672;
+const {
+  RABBITMQ_USER,
+  RABBITMQ_PASSWORD,
+  RABBITMQ_HOST = "localhost",
+  RABBITMQ_PORT = 5672,
+} = process.env;
 
 let connection;
 let channel;
@@ -28,7 +28,7 @@ async function connectRabbitMQ() {
     console.error("RabbitMQ connection closed. Attempting to reconnect...");
     channel = undefined;
     connection = undefined;
-    setTimeout(reconnectRabbitMQ, 5000);
+    setTimeout(() => reconnectRabbitMQ(), 5000);
   });
 
   connection.on("error", (err) => {
@@ -49,7 +49,7 @@ async function reconnectRabbitMQ() {
   } catch (err) {
     console.error("Failed to reconnect to RabbitMQ:", err);
     reconnecting = false;
-    setTimeout(reconnectRabbitMQ, 5000);
+    setTimeout(() => reconnectRabbitMQ(), 5000);
   }
 }
 

@@ -1,4 +1,4 @@
-const requireUser = require('../../src/middleware/requireUser');
+const requireUser = require('../../src/middlewares/requireUser');
 
 const mockRes = () => {
     const res = {};
@@ -30,5 +30,18 @@ test('attaches req.userId / req.userName and calls next when present', () => {
 
     expect(req.userId).toBe('user-1');
     expect(req.userName).toBe('ada');
+    expect(next).toHaveBeenCalledTimes(1);
+});
+
+test('sets req.userName to null when the name header is missing', () => {
+    const headers = { 'X-Auth-User-Id': 'user-1' };
+    const req = { get: (name) => headers[name] };
+    const res = mockRes();
+    const next = jest.fn();
+
+    requireUser(req, res, next);
+
+    expect(req.userId).toBe('user-1');
+    expect(req.userName).toBeNull();
     expect(next).toHaveBeenCalledTimes(1);
 });

@@ -23,6 +23,14 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
         setSubmitting(true);
         setError(null);
         createTask(projectId, { title: newItem.trim(), columnId })
+        fetch('/api/items', {
+            method: 'POST',
+            body: JSON.stringify({ name: newItem }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+            .then(r => r.json())
             .then(item => {
                 onNewItem({
                     id: item.id,

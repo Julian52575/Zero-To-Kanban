@@ -104,4 +104,49 @@ describe('server', () => {
         expect(db.teardown).toHaveBeenCalledTimes(1);
         expect(exitSpy).toHaveBeenCalledTimes(1);
     });
+
+    test('exits with code 1 when the RabbitMQ connection fails', async () => {
+        db = require('../src/persistence');
+        db.init.mockResolvedValue();
+        const rabbitmq = require('../src/events/rabbitmq');
+        const error = new Error('ECONNREFUSED');
+        rabbitmq.connectRabbitMQ.mockRejectedValue(error);
+        app = require('../src/app');
+
+        const { startServer } = require('../src/server');
+        await startServer();
+
+        expect(console.error).toHaveBeenCalledWith(error);
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(app.listen).not.toHaveBeenCalled();
+    });
+
+    test('starts a logging consumer for every task and project event', async () => {
+        db = require('../src/persistence');
+        db.init.mockResolvedValue();
+        const { startConsumeFor } = require('../src/events/eventBus');
+        const { EVENTS } = require('../src/events/events');
+
+        const { startServer } = require('../src/server');
+        await startServer();
+
+        const consumed = startConsumeFor.mock.calls.map(([name]) => name);
+        expect(consumed).toEqual([
+            EVENTS.TASK_CREATED,
+            EVENTS.TASK_UPDATED,
+            EVENTS.TASK_DELETED,
+            EVENTS.TASK_STATUS_UPDATED,
+            EVENTS.PROJECT_CREATED,
+            EVENTS.PROJECT_UPDATED,
+            EVENTS.PROJECT_DELETED,
+        ]);
+
+        for (const [eventName, handler] of startConsumeFor.mock.calls) {
+            await handler({ id: '1' }, 'event-id');
+
+            expect(console.log).toHaveBeenCalledWith(
+                `Handling event: ${eventName} with data: {"id":"1"} and eventId: event-id`
+            );
+        }
+    });
 });
