@@ -24,6 +24,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Level 1 -- independent checks, all scheduled in parallel.
+  # ---------------------------------------------------------------------------
+
   devshell:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -52,29 +56,13 @@ jobs:
             podman-compose -f docker-compose.yml config >/dev/null
           '
 
-  # Runs alongside `frontend` (no `needs` between them = parallel scheduling).
+  # Unit tests only; the running API is exercised by `stack` (level 2).
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
-    services:
-      postgres:
-        image: docker.io/library/postgres:16-alpine
-        env:
-          POSTGRES_USER: todo
-          POSTGRES_PASSWORD: todo
-          POSTGRES_DB: todo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U todo"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://todo:todo@localhost:5432/todo?schema=public
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -109,20 +97,6 @@ jobs:
           name: backend-coverage
           path: backend/coverage
           if-no-files-found: warn
-
-      - name: Apply database migrations
-        run: npx prisma migrate deploy
-
-      - name: Start the API and check it responds
-        run: |
-          npm start &
-          trap 'kill $!' EXIT
-          for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:3000/items > /dev/null && exit 0
-            sleep 1
-          done
-          echo "backend did not respond on :3000 in time" >&2
-          exit 1
 
   # Runs alongside `backend` (no `needs` between them = parallel scheduling).
   frontend:
@@ -176,11 +150,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Load .env
+        run: |
+          cp .env.example .env
+          grep -E '^[A-Z_]+=' .env.example >> "$GITHUB_ENV"
+
       - name: Start the db service and wait for its healthcheck
         run: docker compose up -d --wait db
 
       - name: Check the database accepts connections
-        run: docker compose exec -T db pg_isready -U todo -d todo
+        run: docker compose exec -T db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 
       - name: Show db logs on failure
         if: failure()
@@ -190,20 +169,149 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
-  # Runs alongside backend/frontend/database. Audits THIS branch's lockfiles
-  # against the GitHub Advisory Database with `npm audit` -- the same advisory
-  # data Dependabot uses, resolved from the pull-request branch's own
+  # Same shape as `database`: the `rabbitmq` service from docker-compose.yml
+  # as-is -- container image + healthcheck + broker diagnostics.
+  rabbitmq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Load .env
+        run: cp .env.example .env
+
+      - name: Start the rabbitmq service and wait for its healthcheck
+        run: docker compose up -d --wait rabbitmq
+
+      - name: Check the broker is running and accepts AMQP connections
+        run: |
+          docker compose exec -T rabbitmq rabbitmq-diagnostics -q check_running
+          docker compose exec -T rabbitmq rabbitmq-diagnostics -q check_port_connectivity
+
+      - name: Show rabbitmq logs on failure
+        if: failure()
+        run: docker compose logs rabbitmq
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes
+
+  # Unit tests for the login service (db / prisma are mocked in each spec).
+  auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: auth/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  # Every Dockerfile / Containerfile tracked in the repo -- a new one is
+  # picked up without touching this workflow. Mounts the repo so hadolint
+  # reads a root .hadolint.yaml if one exists.
+  dockerfile-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Lint every Dockerfile with hadolint
+        run: |
+          set -uo pipefail
+          mapfile -t files < <(git ls-files -- \
+            '*Dockerfile' '*Dockerfile.*' '*Containerfile' '*Containerfile.*')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no Dockerfile found"
+            exit 0
+          fi
+
+          failed=0
+          for f in "${files[@]}"; do
+            echo "--- $f"
+            if docker run --rm -v "$PWD:/repo:ro" -w /repo \
+              docker.io/hadolint/hadolint:v2.12.0 hadolint "$f"; then
+              echo "ok    $f"
+            else
+              echo "::error file=$f::hadolint reported issues in $f"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+  # The compose file parses and interpolates cleanly with the example .env.
+  compose-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Load .env
+        run: cp .env.example .env
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+  # Every workflow actionlint finds under .github/workflows -- a new one is
+  # picked up without touching this workflow -- including the shellcheck pass
+  # on each `run:` script (bundled in the actionlint image).
+  workflow-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Lint with actionlint
+        run: >-
+          docker run --rm -v "$PWD:/repo:ro" -w /repo
+          docker.io/rhysd/actionlint:1.7.12
+          -color
+
+  # Audits THIS branch's lockfile, one workspace per matrix leg, against the
+  # GitHub Advisory Database with `npm audit` -- the same advisory data
+  # Dependabot uses, resolved from the pull-request branch's own
   # package-lock.json rather than from `main` (all the Dependabot alerts API can
   # report on). Software-composition analysis, not SAST, so it lives here and
   # not in ci-sast.yml.
   #
-  # Gate (both workspaces combined): fails on any Critical or High advisory, or
-  # on 5 or more Moderate+Low. Also fails if `npm audit` cannot be completed --
-  # an unknown posture is not a passing one. The counts and every advisory land
-  # in the job summary, and the raw reports upload as an artifact, pass or fail.
+  # Gate (per workspace): fails on any Critical or High advisory, or on 5 or
+  # more Moderate+Low. Also fails if `npm audit` cannot be completed -- an
+  # unknown posture is not a passing one. The counts and every advisory land
+  # in the job summary, and the raw report uploads as an artifact, pass or fail.
+  #
+  # Not a prerequisite of `stack`: a new advisory should not block the
+  # integration run, only `ci-required`.
   dependencies-audit:
+    name: dependencies-audit (${{ matrix.workspace }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [frontend, backend]
+    env:
+      WS: ${{ matrix.workspace }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -216,115 +324,243 @@ jobs:
         with:
           node-version: 24
 
-      - name: Audit each workspace lockfile
+      - name: Audit the workspace lockfile
         run: |
           set -euo pipefail
           mkdir -p dependency-audit
+          raw="dependency-audit/${WS}.json"
 
-          # --- collect `npm audit` for each workspace, retrying transient failures ---
-          audit_ok=1
-          for ws in backend frontend; do
-            raw="dependency-audit/${ws}.json"
-            for attempt in 1 2 3; do
-              # npm audit exits non-zero when it finds advisories -- that is
-              # still a valid report, so judge the JSON body, not the status.
-              ( cd "$ws" && npm audit --json ) > "$raw" 2>/dev/null || true
-              jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1 && break
-              [ "$attempt" -lt 3 ] && sleep 3 || true
-            done
-            if ! jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
-              audit_ok=0
-              echo "::error::npm audit produced no usable report for ${ws}"
-              echo '{}' > "$raw"   # keep the file valid JSON for the steps below
-            fi
+          # --- collect `npm audit`, retrying transient failures ---
+          for attempt in 1 2 3; do
+            # npm audit exits non-zero when it finds advisories -- that is
+            # still a valid report, so judge the JSON body, not the status.
+            ( cd "$WS" && npm audit --json ) > "$raw" 2>/dev/null || true
+            jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1 && break
+            [ "$attempt" -lt 3 ] && sleep 3 || true
           done
+          if ! jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
+            echo "::error::npm audit produced no usable report for ${WS} -- an unknown posture cannot clear the gate"
+            echo '{}' > "$raw"
+            exit 1
+          fi
 
-          # --- totals across every workspace that reported ---
-          sev() { jq -s --arg k "$1" '[ .[].metadata.vulnerabilities[$k] // 0 ] | add // 0' dependency-audit/*.json; }
+          sev() { jq --arg k "$1" '.metadata.vulnerabilities[$k] // 0' "$raw"; }
           crit=$(sev critical); high=$(sev high); mod=$(sev moderate); low=$(sev low)
           ch=$((crit + high)); ml=$((mod + low))
 
           {
-            echo "### Dependency audit (\`npm audit\`)"
+            echo "### Dependency audit: \`${WS}\` (\`npm audit\`)"
             echo
-            echo "_This branch's \`package-lock.json\` files vs the GitHub Advisory Database. \`main\`'s posture lives in **Security → Dependabot**._"
+            echo "_This branch's \`${WS}/package-lock.json\` vs the GitHub Advisory Database. \`main\`'s posture lives in **Security → Dependabot**._"
             echo
-            echo '| Workspace | Critical | High | Moderate | Low | Total |'
-            echo '| --- | --- | --- | --- | --- | --- |'
-            for ws in backend frontend; do
-              raw="dependency-audit/${ws}.json"
-              if jq -e '.metadata.vulnerabilities' "$raw" > /dev/null 2>&1; then
-                jq -r --arg ws "$ws" '.metadata.vulnerabilities
-                  | "| `\($ws)` | \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"' "$raw"
-              else
-                echo "| \`$ws\` | ? | ? | ? | ? | npm audit failed |"
-              fi
-            done
-
+            echo '| Critical | High | Moderate | Low | Total |'
+            echo '| --- | --- | --- | --- | --- |'
+            jq -r '.metadata.vulnerabilities
+              | "| \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"' "$raw"
             echo
             echo "**Gate:** any Critical or High fails; 5 or more Moderate+Low fails. Found **${crit}** Critical, **${high}** High, **${ml}** Moderate+Low."
             echo
             echo '<details><summary>Advisories</summary>'
             echo
-            echo '| Workspace | Severity | Package | Direct | Fix | Advisory |'
-            echo '| --- | --- | --- | --- | --- | --- |'
-            for ws in backend frontend; do
-              raw="dependency-audit/${ws}.json"
-              [ -f "$raw" ] || continue
-              jq -r --arg ws "$ws" '
-                (.vulnerabilities // {}) | to_entries[] | .value | . as $v
-                | ([$v.via[]? | select(type == "object")]) as $adv
-                | ([$v.via[]? | select(type == "string")]) as $chain
-                | "| \($ws) | \($v.severity) | `\($v.name)` "
-                  + "| \(if $v.isDirect then "yes" else "no" end) "
-                  + "| \(if ($v.fixAvailable | type) == "object" then $v.fixAvailable.version
-                          elif $v.fixAvailable then "yes" else "no" end) "
-                  + "| \(if ($adv | length) > 0
-                          then [$adv[] | "[\(.title)](\(.url))"] | join("<br>")
-                          else "via " + ($chain | join(", ")) end) |"
-              ' "$raw"
-            done
+            echo '| Severity | Package | Direct | Fix | Advisory |'
+            echo '| --- | --- | --- | --- | --- |'
+            jq -r '
+              (.vulnerabilities // {}) | to_entries[] | .value | . as $v
+              | ([$v.via[]? | select(type == "object")]) as $adv
+              | ([$v.via[]? | select(type == "string")]) as $chain
+              | "| \($v.severity) | `\($v.name)` "
+                + "| \(if $v.isDirect then "yes" else "no" end) "
+                + "| \(if ($v.fixAvailable | type) == "object" then $v.fixAvailable.version
+                        elif $v.fixAvailable then "yes" else "no" end) "
+                + "| \(if ($adv | length) > 0
+                        then [$adv[] | "[\(.title)](\(.url))"] | join("<br>")
+                        else "via " + ($chain | join(", ")) end) |"
+            ' "$raw"
             echo
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
 
           # --- gate ---
-          if [ "$audit_ok" -ne 1 ]; then
-            echo "::error::dependency audit incomplete -- an unknown posture cannot clear the gate"
-            exit 1
-          fi
           rc=0
           if [ "$ch" -gt 0 ]; then
-            echo "::error::${crit} critical + ${high} high dependency vulnerabilities found (allowed: 0)"
+            echo "::error::${crit} critical + ${high} high dependency vulnerabilities found in ${WS} (allowed: 0)"
             echo "::error::Please refer to the workflow summary for details"
             rc=1
           fi
           if [ "$ml" -ge 5 ]; then
-            echo "::error::${ml} moderate + low dependency vulnerabilities found (allowed: fewer than 5)"
+            echo "::error::${ml} moderate + low dependency vulnerabilities found in ${WS} (allowed: fewer than 5)"
             echo "::error::Please refer to the workflow summary for details"
             rc=1
           fi
           exit "$rc"
 
-      - name: Upload the raw audit reports
+      - name: Upload the raw audit report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: dependency-audit
+          name: dependency-audit-${{ matrix.workspace }}
           path: dependency-audit
           if-no-files-found: warn
 
+  # ---------------------------------------------------------------------------
+  # Level 2 -- the whole docker-compose stack, then a call to every service.
+  # Runs only once every level-1 job except dependencies-audit has passed.
+  # ---------------------------------------------------------------------------
+  stack:
+    needs:
+      - devshell
+      - backend
+      - frontend
+      - database
+      - rabbitmq
+      - auth
+      - dockerfile-lint
+      - compose-lint
+      - workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROXY: http://127.0.0.1:8000
+      DASHBOARD: http://127.0.0.1:8080
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The example .env with a throwaway SESSION_SECRET for this run only.
+      - name: Load .env
+        run: |
+          cp .env.example .env
+          sed -i "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env
+
+      - name: Build the images
+        run: docker compose build
+
+      - name: Start the whole stack and wait for every healthcheck
+        run: docker compose up -d --wait --wait-timeout 300
+
+      - name: Wait for Traefik to register every router
+        run: |
+          for _ in $(seq 1 30); do
+            routers=$(curl -sf "$DASHBOARD/api/http/routers" | jq -r '.[].name' || true)
+            if grep -qx 'auth@docker' <<<"$routers" \
+              && grep -qx 'backend@docker' <<<"$routers" \
+              && grep -qx 'frontend@docker' <<<"$routers"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Traefik did not register the auth/backend/frontend routers in time" >&2
+          echo "registered: ${routers:-<none>}" >&2
+          exit 1
+
+      - name: Call each service
+        run: |
+          set -uo pipefail
+          jar="$RUNNER_TEMP/cookies.txt"
+          failed=0
+
+          # expect <label> <status> <curl args...>: fail the step (but keep
+          # going) when the HTTP status differs from the expected one.
+          expect() {
+            local label="$1" want="$2"; shift 2
+            local got
+            got=$(curl -s -o /dev/null -w '%{http_code}' "$@")
+            if [ "$got" = "$want" ]; then
+              echo "ok    $label -> $got"
+            else
+              echo "::error::$label: expected HTTP $want, got $got"
+              failed=1
+            fi
+          }
+
+          # run <label> <command...>: same, for a command's exit status.
+          run() {
+            local label="$1"; shift
+            if "$@" > /dev/null; then
+              echo "ok    $label"
+            else
+              echo "::error::$label failed"
+              failed=1
+            fi
+          }
+
+          echo '--- db / authdb'
+          # Single quotes on purpose: $POSTGRES_* expand inside the container.
+          # shellcheck disable=SC2016
+          run 'db accepts connections' \
+            docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+          # shellcheck disable=SC2016
+          run 'authdb accepts connections' \
+            docker compose exec -T authdb sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+          echo '--- rabbitmq'
+          run 'rabbitmq is running' \
+            docker compose exec -T rabbitmq rabbitmq-diagnostics -q check_running
+          run 'rabbitmq accepts AMQP connections' \
+            docker compose exec -T rabbitmq rabbitmq-diagnostics -q check_port_connectivity
+
+          echo '--- proxy'
+          expect 'proxy dashboard API' 200 "$DASHBOARD/api/overview"
+
+          echo '--- auth (public routes)'
+          expect 'GET /login page' 200 "$PROXY/login"
+          expect 'GET /register page' 200 "$PROXY/register"
+          expect 'GET /auth/me without a session' 401 "$PROXY/auth/me"
+          user="ci-$(openssl rand -hex 4)"
+          expect 'POST /auth/register' 201 -c "$jar" \
+            -H 'Content-Type: application/json' \
+            -d "{\"username\":\"$user\",\"password\":\"ci-password-$user\"}" \
+            "$PROXY/auth/register"
+          expect 'GET /auth/me with the session' 200 -b "$jar" "$PROXY/auth/me"
+
+          echo '--- backend (guarded by ForwardAuth)'
+          expect 'GET /api/items without a session' 401 "$PROXY/api/items"
+          expect 'GET /api/items with the session' 200 -b "$jar" "$PROXY/api/items"
+          expect 'GET /api/projects with the session' 200 -b "$jar" "$PROXY/api/projects"
+
+          echo '--- frontend (guarded by ForwardAuth)'
+          expect 'GET / in a browser without a session redirects to /login' 302 \
+            -H 'Accept: text/html' "$PROXY/"
+          expect 'GET / with the session' 200 -b "$jar" -H 'Accept: text/html' "$PROXY/"
+
+          exit "$failed"
+
+      - name: Show the stack state and logs on failure
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes
+
+  # ---------------------------------------------------------------------------
   # Single stable check for the branch ruleset to require.
   # Add a job to `needs` here to make it mandatory to the branch ruleset.
+  # ---------------------------------------------------------------------------
   ci-required:
     if: always()
-    needs: [devshell, backend, frontend, database, dependencies-audit]
+    needs:
+      - devshell
+      - backend
+      - frontend
+      - database
+      - rabbitmq
+      - auth
+      - dockerfile-lint
+      - compose-lint
+      - workflow-lint
+      - dependencies-audit
+      - stack
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Every required job passed
         run: |
-          if printf '%s\n' '${{ join(needs.*.result, ' ') }}' | grep -Eqw 'failure|cancelled'; then
+          # `skipped` counts too: `stack` is skipped when a level-1 job fails.
+          if printf '%s\n' '${{ join(needs.*.result, ' ') }}' | grep -Eqw 'failure|cancelled|skipped'; then
             echo "a required job did not succeed: ${{ join(needs.*.result, ', ') }}"
             exit 1
           fi
