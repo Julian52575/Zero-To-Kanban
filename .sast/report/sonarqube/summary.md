@@ -7,9 +7,9 @@
 | Reliability | A · 0 bug(s) |
 | Security | A · 0 vulnerability(ies) |
 | Security hotspots | 0 |
-| Maintainability | A · 1 smell(s) |
-| Coverage | 94.5% |
+| Maintainability | A · 8 smell(s) |
+| Coverage | 98.1% |
 | Duplication | 0.0% |
-| Lines of code | 512 |
+| Lines of code | 1112 |
 
-_Analysis `9053d075-70a5-4369-87e7-b91b7eba3ccb` · refreshed 2026-09-18T12:53:01Z._
+_Analysis `dc9a80b5-09b4-49c5-9474-11ac72fc9842` · refreshed 2026-09-24T10:42:26Z._
