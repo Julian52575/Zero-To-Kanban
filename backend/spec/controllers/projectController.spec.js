@@ -1,4 +1,7 @@
 jest.mock('../../src/services/projectService');
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
 
 const projectService = require('../../src/services/projectService');
 const projectController = require('../../src/controllers/projectController');
