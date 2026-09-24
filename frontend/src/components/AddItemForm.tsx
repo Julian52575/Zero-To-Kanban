@@ -16,27 +16,29 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
     const [error, setError] = React.useState<string | null>(null);
 
 
-    const submitNewItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    const submitNewItem = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!columnId) return;
 
         setSubmitting(true);
         setError(null);
-        try {
-            const task = await createTask(projectId, { title: newItem.trim(), columnId });
-            onNewItem({
-                id: task.id,
-                name: task.title,
-                completed: false,
-                status: 'todo',
+        createTask(projectId, { title: newItem.trim(), columnId })
+            .then(task => {
+                onNewItem({
+                    id: task.id,
+                    name: task.title,
+                    completed: false,
+                    status: 'todo',
+                });
+                setNewItem('');
+            })
+            .catch(error => {
+                console.error(error);
+                setError(getErrorMessage(error));
+            })
+            .finally(() => {
+                setSubmitting(false);
             });
-            setNewItem('');
-        } catch (error) {
-            console.error(error);
-            setError(getErrorMessage(error));
-        } finally {
-            setSubmitting(false);
-        }
     };
     const isDisabled = submitting || !columnId || newItem.trim().length === 0;
 
