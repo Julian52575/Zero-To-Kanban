@@ -21,8 +21,14 @@ see. Consumers are matched by URL, so they apply to every method on the row.
 | /internal/verify | auth/src/app.js | GET |  |
 | /login | auth/src/app.js | GET | auth/src/pages/register.html |
 | /register | auth/src/app.js | GET | auth/src/pages/login.html |
+| /projects/00000000-0000-0000-0000-000000000000 | backend/spec/routes/project.spec.js | GET |  |
+| /projects/p1/tasks | backend/spec/routes/task.spec.js | GET, POST |  |
+| /projects/p1/tasks/nope | backend/spec/routes/task.spec.js | DELETE |  |
+| /projects/p1/tasks/t1 | backend/spec/routes/task.spec.js | DELETE, GET, PUT |  |
+| /projects/p1/tasks/t9 | backend/spec/routes/task.spec.js | GET |  |
+| /projects/p2/tasks/t1 | backend/spec/routes/task.spec.js | DELETE, PUT |  |
 | /health | backend/src/app.js | GET |  |
-| /items | backend/src/app.js | GET, POST |  |
+| /items | backend/src/app.js | GET, POST | backend/spec/app.spec.js |
 | /items/:id | backend/src/app.js | DELETE, GET, PATCH, PUT |  |
 | /projects | backend/src/app.js | GET, POST | frontend/src/services/ProjectApi.ts |
 | /projects/:id | backend/src/app.js | DELETE, GET, PATCH, PUT | frontend/src/services/ProjectApi.ts |
