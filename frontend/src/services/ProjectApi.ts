@@ -3,7 +3,7 @@ import { projectSchema, projectsSchema } from "../schemas/ProjectSchema";
 import type { Project } from "../types/Project";
 
 export const getProjects = async (): Promise<Project[]> => {
-  const data = await apiClient.get<Project[]>("/api/projects");
+  const data: Project[] = await apiClient.get("/projects");
   const projectsWithDates = data.map((project: Project) => ({
     ...project,
     createdAt: new Date(project.createdAt || Date.now()),
@@ -12,7 +12,7 @@ export const getProjects = async (): Promise<Project[]> => {
 };
 
 export const createProject = async (name: string): Promise<Project> => {
-  const data = await apiClient.post<Project>("/api/projects", {
+  const data: Project = await apiClient.post("/projects", {
     name,
   });
   const projectWithDate = {
@@ -23,7 +23,7 @@ export const createProject = async (name: string): Promise<Project> => {
 };
 
 export const updateProject = async (item: Project): Promise<Project> => {
-  const data = await apiClient.put<Project>(`/api/projects/${item.id}`, {
+  const data: Project = await apiClient.put(`/projects/${item.id}`, {
     name: item.name,
     createdAt: item.createdAt,
   });
@@ -35,5 +35,5 @@ export const updateProject = async (item: Project): Promise<Project> => {
 };
 
 export const deleteProject = (id: string): Promise<void> => {
-  return apiClient.delete(`/api/projects/${id}`);
+  return apiClient.delete(`/projects/${id}`);
 };

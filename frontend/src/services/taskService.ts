@@ -2,15 +2,13 @@ import apiClient from "./apiClient";
 import { taskSchema, tasksSchema } from "../schemas/taskSchema";
 import type { Task, CreateTaskInput, UpdateTaskInput } from "../types/task";
 
-const base = (projectId: string) => `/api/projects/${projectId}/tasks`;
-
 export const getTasks = async (projectId: string): Promise<Task[]> => {
-  const data = await apiClient.get<Task[]>(base(projectId));
+  const data: Task[] = await apiClient.get(`/projects/${projectId}/tasks`);
   return tasksSchema.parse(data);
 };
 
 export const getTask = async (projectId: string, id: string): Promise<Task> => {
-  const data = await apiClient.get<Task>(`${base(projectId)}/${id}`);
+  const data: Task = await apiClient.get(`/projects/${projectId}/tasks/${id}`);
   return taskSchema.parse(data);
 };
 
@@ -18,7 +16,7 @@ export const createTask = async (
   projectId: string,
   input: CreateTaskInput
 ): Promise<Task> => {
-  const data = await apiClient.post<Task>(base(projectId), input);
+  const data: Task = await apiClient.post(`/projects/${projectId}/tasks`, input);
   return taskSchema.parse(data);
 };
 
@@ -27,7 +25,7 @@ export const updateTask = async (
   id: string,
   input: UpdateTaskInput
 ): Promise<Task> => {
-  const data = await apiClient.put<Task>(`${base(projectId)}/${id}`, input);
+  const data: Task = await apiClient.put(`/projects/${projectId}/tasks/${id}`, input);
   return taskSchema.parse(data);
 };
 
@@ -40,5 +38,5 @@ export const moveTask = (
 ): Promise<Task> => updateTask(projectId, id, { columnId, order });
 
 export const deleteTask = (projectId: string, id: string): Promise<void> => {
-  return apiClient.delete(`${base(projectId)}/${id}`);
+  return apiClient.delete(`/projects/${projectId}/tasks/${id}`);
 };

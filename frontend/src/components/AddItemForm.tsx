@@ -2,6 +2,7 @@ import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
 import type { Item } from '../types/item';
 import { getErrorMessage } from '../utils/errorMessage';
+import apiClient from '../services/apiClient';
 import { createTask } from '../services/taskService';
 
 interface AddItemFormProps {
@@ -16,37 +17,30 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
     const [error, setError] = React.useState<string | null>(null);
 
 
-    const submitNewItem = (e: React.FormEvent<HTMLFormElement>) => {
+    const submitNewItem = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!columnId) return;
 
         setSubmitting(true);
         setError(null);
         createTask(projectId, { title: newItem.trim(), columnId })
-        fetch('/api/items', {
-            method: 'POST',
-            body: JSON.stringify({ name: newItem }),
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(r => r.json())
-            .then(item => {
-                onNewItem({
-                    id: item.id,
-                    name: item.title,
-                    completed: false,
-                    status: 'todo',
-                });
-                setNewItem('');
-            })
-            .catch(error => {
-                console.error(error);
-                setError(getErrorMessage(error));
-            })
-            .finally(() => {
-                setSubmitting(false);
+        try {
+            const item: { id: string; title: string } = await apiClient.post('/items', {
+                name: newItem,
             });
+            onNewItem({
+                id: item.id,
+                name: item.title,
+                completed: false,
+                status: 'todo',
+            });
+            setNewItem('');
+        } catch (error) {
+            console.error(error);
+            setError(getErrorMessage(error));
+        } finally {
+            setSubmitting(false);
+        }
     };
     const isDisabled = submitting || newItem.trim().length === 0;
 
