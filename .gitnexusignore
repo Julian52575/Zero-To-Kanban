@@ -7,11 +7,6 @@
 # Generated from the index itself -- indexing it would feed the output back in.
 docs/gitnexus/
 
-# Stale .jsx duplicates of App.tsx / main.tsx (Vite resolves the .tsx first,
-# see frontend/vite.config.js). Indexed, they duplicate App/main symbols.
-frontend/src/App.jsx
-frontend/src/main.jsx
-
 # Applied migration history; prisma/schema.prisma is the current model.
 **/prisma/migrations/
 

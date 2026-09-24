@@ -22,8 +22,8 @@ see. Consumers are matched by URL, so they apply to every method on the row.
 | /login | auth/src/app.js | GET | auth/src/pages/register.html |
 | /register | auth/src/app.js | GET | auth/src/pages/login.html |
 | /health | backend/src/app.js | GET |  |
-| /items | backend/src/app.js | GET, POST | frontend/src/components/AddItemForm.tsx, frontend/src/services/itemsApi.ts |
-| /items/:id | backend/src/app.js | DELETE, GET, PATCH, PUT | frontend/src/services/itemsApi.ts |
+| /items | backend/src/app.js | GET, POST |  |
+| /items/:id | backend/src/app.js | DELETE, GET, PATCH, PUT |  |
 | /projects | backend/src/app.js | GET, POST | frontend/src/services/ProjectApi.ts |
 | /projects/:id | backend/src/app.js | DELETE, GET, PATCH, PUT | frontend/src/services/ProjectApi.ts |
 | /projects/:projectId/columns | backend/src/app.js | GET | frontend/src/services/columnService.ts |
