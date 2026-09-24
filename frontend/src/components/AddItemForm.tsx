@@ -23,18 +23,10 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
         setSubmitting(true);
         setError(null);
         createTask(projectId, { title: newItem.trim(), columnId })
-        fetch('/api/items', {
-            method: 'POST',
-            body: JSON.stringify({ name: newItem }),
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(r => r.json())
-            .then(item => {
+            .then(task => {
                 onNewItem({
-                    id: item.id,
-                    name: item.title,
+                    id: task.id,
+                    name: task.title,
                     completed: false,
                     status: 'todo',
                 });
@@ -48,7 +40,7 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
                 setSubmitting(false);
             });
     };
-    const isDisabled = submitting || newItem.trim().length === 0;
+    const isDisabled = submitting || !columnId || newItem.trim().length === 0;
 
     return (
         <Form onSubmit={submitNewItem}>
