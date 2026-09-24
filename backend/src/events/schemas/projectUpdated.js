@@ -1,31 +1,10 @@
 const { z } = require("zod");
+const projectSchema = require("./project");
 
 const projectUpdatedSchema = z.object({
   id: z.string().uuid(),
-  beforeUpdate: z.object({
-    id: z.string().uuid().optional(),
-    name: z.string().min(1).max(100),
-    createdAt: z
-      .string()
-      .refine((date) => !isNaN(Date.parse(date)), {
-        message: "Invalid date format",
-      })
-      .optional(),
-    ownerId: z.string().uuid(),
-    columns: z.array(z.object({})),
-  }),
-  afterUpdate: z.object({
-    id: z.string().uuid().optional(),
-    name: z.string().min(1).max(100),
-    createdAt: z
-      .string()
-      .refine((date) => !isNaN(Date.parse(date)), {
-        message: "Invalid date format",
-      })
-      .optional(),
-    ownerId: z.string().uuid(),
-    columns: z.array(z.object({})),
-  }),
+  beforeUpdate: projectSchema,
+  afterUpdate: projectSchema,
 });
 
 module.exports = projectUpdatedSchema;

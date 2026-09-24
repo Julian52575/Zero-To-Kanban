@@ -1,22 +1,55 @@
 const taskService = require("../services/taskService");
 const { EVENTS } = require("../events/events");
 const { publishEvent } = require("../events/eventBus");
+const { taskPayload } = require("../events/payloads");
 const {
   userCanAccessProject,
   columnBelongsToProject,
   storeTask,
 } = require("../persistence");
 
-async function getTasks(req, res) {
-  const tasks = await taskService.getTasks(req.params.projectId);
+async function getTasks(req, res, next) {
+  try {
+    const { projectId } = req.params;
 
-  res.json(tasks);
+    if (!(await userCanAccessProject(req.userId, projectId))) {
+      return res.status(404).json({ error: "project not found" });
+    }
+
+    const tasks = await taskService.getTasks(projectId);
+
+    res.json(tasks);
+  } catch (err) {
+    next(err);
+  }
 }
 
-async function getTask(req, res) {
-  const task = await taskService.getTask(req.params.id);
+// The task must exist and live in the project named in the URL.
+async function findProjectTask(projectId, taskId) {
+  const task = await taskService.getTask(taskId);
+  if (!task || task.column.projectId !== projectId) {
+    return null;
+  }
+  return task;
+}
 
-  res.json(task);
+async function getTask(req, res, next) {
+  try {
+    const { projectId, id } = req.params;
+
+    if (!(await userCanAccessProject(req.userId, projectId))) {
+      return res.status(404).json({ error: "project not found" });
+    }
+
+    const task = await findProjectTask(projectId, id);
+    if (!task) {
+      return res.status(404).json({ error: "task not found" });
+    }
+
+    res.json(task);
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function createTask(req, res, next) {
@@ -40,7 +73,7 @@ async function createTask(req, res, next) {
     });
 
     try {
-      await publishEvent(EVENTS.TASK_CREATED, task);
+      await publishEvent(EVENTS.TASK_CREATED, taskPayload(task, projectId));
     } catch (error) {
       console.error("Failed to publish TASK_CREATED event:", error);
     }
@@ -51,17 +84,39 @@ async function createTask(req, res, next) {
   }
 }
 
-async function updateTask(req, res) {
-  const userId = req.userId;
-  const taskId = req.params.id;
-  const task = await taskService.updateTask(taskId, userId, req.body);
+async function updateTask(req, res, next) {
   try {
-    await publishEvent(EVENTS.TASK_UPDATED, task);
-  } catch (error) {
-    console.error("Failed to publish TASK_UPDATED event:", error);
-  }
+    const { projectId, id } = req.params;
+    const { columnId } = req.body;
 
-  res.json(task);
+    if (!(await userCanAccessProject(req.userId, projectId))) {
+      return res.status(404).json({ error: "project not found" });
+    }
+
+    if (!(await findProjectTask(projectId, id))) {
+      return res.status(404).json({ error: "task not found" });
+    }
+
+    // A move must stay inside the project.
+    if (
+      columnId !== undefined &&
+      !(await columnBelongsToProject(columnId, projectId))
+    ) {
+      return res.status(400).json({ error: "invalid column" });
+    }
+
+    const task = await taskService.updateTask(id, req.body);
+
+    try {
+      await publishEvent(EVENTS.TASK_UPDATED, taskPayload(task, projectId));
+    } catch (error) {
+      console.error("Failed to publish TASK_UPDATED event:", error);
+    }
+
+    res.json(task);
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function deleteTask(req, res) {
@@ -79,13 +134,14 @@ async function deleteTask(req, res) {
   }
 
   try {
-    await publishEvent(EVENTS.TASK_DELETED, { id: taskId });
+    await publishEvent(EVENTS.TASK_DELETED, { taskId });
   } catch (error) {
     console.error("Failed to publish TASK_DELETED event:", error);
   }
 
   return res.status(204).end();
 }
+
 module.exports = {
   getTasks,
   getTask,

@@ -1,9 +1,9 @@
 jest.mock('../../src/persistence', () => ({
-    getItems: jest.fn(),
-    getItem: jest.fn(),
-    storeItem: jest.fn(),
-    updateItem: jest.fn(),
-    removeItem: jest.fn(),
+    getTasks: jest.fn(),
+    getTask: jest.fn(),
+    storeTask: jest.fn(),
+    updateTask: jest.fn(),
+    deleteTask: jest.fn(),
 }));
 
 const db = require('../../src/persistence');
@@ -14,54 +14,52 @@ describe('taskRepository', () => {
         jest.clearAllMocks();
     });
 
-    test('getAll delegates to db.getItems', async () => {
-        const tasks = [{ id: '1', name: 'Task 1', completed: false }];
-        db.getItems.mockResolvedValue(tasks);
+    test('getAll delegates to db.getTasks', async () => {
+        const tasks = [{ id: '1', title: 'Task 1' }];
+        db.getTasks.mockResolvedValue(tasks);
 
-        const result = await taskRepository.getAll();
+        const result = await taskRepository.getAll('p1');
 
-        expect(db.getItems).toHaveBeenCalledTimes(1);
+        expect(db.getTasks).toHaveBeenCalledWith('p1');
         expect(result).toEqual(tasks);
     });
 
-    test('getById delegates to db.getItem', async () => {
-        const task = { id: '1', name: 'Task 1', completed: false };
-        db.getItem.mockResolvedValue(task);
+    test('getById delegates to db.getTask', async () => {
+        const task = { id: '1', title: 'Task 1' };
+        db.getTask.mockResolvedValue(task);
 
         const result = await taskRepository.getById('1');
 
-        expect(db.getItem).toHaveBeenCalledTimes(1);
-        expect(db.getItem).toHaveBeenCalledWith('1');
+        expect(db.getTask).toHaveBeenCalledWith('1');
         expect(result).toEqual(task);
     });
 
-    test('create delegates to db.storeItem', async () => {
-        const task = { id: '1', name: 'Task 1', completed: false };
-        db.storeItem.mockResolvedValue(task);
+    test('create delegates to db.storeTask', async () => {
+        const data = { title: 'Task 1' };
+        const task = { id: '1', ...data };
+        db.storeTask.mockResolvedValue(task);
 
-        const result = await taskRepository.create(task);
+        const result = await taskRepository.create('c1', 'u1', data);
 
-        expect(db.storeItem).toHaveBeenCalledTimes(1);
-        expect(db.storeItem).toHaveBeenCalledWith(task);
+        expect(db.storeTask).toHaveBeenCalledWith('c1', 'u1', data);
         expect(result).toEqual(task);
     });
 
-    test('update delegates to db.updateItem', async () => {
-        const data = { name: 'Updated', completed: true };
-        db.updateItem.mockResolvedValue();
+    test('update delegates to db.updateTask', async () => {
+        const data = { title: 'Updated' };
+        db.updateTask.mockResolvedValue({ id: '1', ...data });
 
-        await taskRepository.update('1', data);
+        const result = await taskRepository.update('1', data);
 
-        expect(db.updateItem).toHaveBeenCalledTimes(1);
-        expect(db.updateItem).toHaveBeenCalledWith('1', data);
+        expect(db.updateTask).toHaveBeenCalledWith('1', data);
+        expect(result).toEqual({ id: '1', ...data });
     });
 
-    test('deleteById delegates to db.removeItem', async () => {
-        db.removeItem.mockResolvedValue();
+    test('deleteById delegates to db.deleteTask', async () => {
+        db.deleteTask.mockResolvedValue();
 
         await taskRepository.deleteById('1');
 
-        expect(db.removeItem).toHaveBeenCalledTimes(1);
-        expect(db.removeItem).toHaveBeenCalledWith('1');
+        expect(db.deleteTask).toHaveBeenCalledWith('1');
     });
 });

@@ -12,6 +12,10 @@ async function getById(id) {
     return db.getProject(id);
 }
 
+async function update(id, data) {
+    return db.updateProject(id, data);
+}
+
 async function deleteProject(id) {
     return db.deleteProject(id);
 }
@@ -28,6 +32,7 @@ module.exports = {
     create,
     getAll,
     getById,
+    update,
     deleteProject,
     getColumnsByProject,
     userCanAccessProject,

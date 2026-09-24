@@ -22,6 +22,7 @@ const { getColumns } = require('./controllers/ColumnController');
 
 const {
     validateCreateProject,
+    validateUpdateProject,
 } = require('./middlewares/projectValidation');
 
 const requireUser = require('./middlewares/requireUser');
@@ -48,8 +49,8 @@ apiRouter.get('/projects', getProjects);
 apiRouter.get('/projects/:id', getProject);
 apiRouter.post('/projects', validateCreateProject, createProject);
 apiRouter.delete('/projects/:id', deleteProject);
-apiRouter.put('/projects/:id', updateProject);
-apiRouter.patch('/projects/:id', updateProject);
+apiRouter.put('/projects/:id', validateUpdateProject, updateProject);
+apiRouter.patch('/projects/:id', validateUpdateProject, updateProject);
 
 apiRouter.get('/projects/:projectId/tasks', getTasks);
 apiRouter.get('/projects/:projectId/tasks/:id', getTask);
