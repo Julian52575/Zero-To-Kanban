@@ -1,131 +1,245 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TodoList from './TodoList';
+import type { Item } from '../types/item';
+import type { Task } from '../types/task';
+import {
+    getTasks,
+    createTask,
+    updateTask,
+    moveTask,
+    deleteTask,
+} from '../services/taskService';
+import { getColumns, type Column } from '../services/columnService';
+import { ApiError } from '../services/apiClient';
+
+vi.mock('../services/taskService', () => ({
+    getTasks: vi.fn(),
+    createTask: vi.fn(),
+    updateTask: vi.fn(),
+    moveTask: vi.fn(),
+    deleteTask: vi.fn(),
+}));
+
+vi.mock('../services/columnService', () => ({
+    getColumns: vi.fn(),
+}));
+
+// Drag and drop can't be driven in jsdom, so the board is replaced by a stub
+// exposing each callback as a button. KanbanBoard has its own render tests.
+vi.mock('./KanbanBoard', () => ({
+    default: ({
+        items,
+        onItemRename,
+        onItemDelete,
+        onStatusChange,
+    }: {
+        items: Item[];
+        onItemRename: (item: Item, name: string) => void;
+        onItemDelete: (item: Item) => void;
+        onStatusChange: (item: Item, status: 'todo' | 'doing' | 'done') => void;
+    }) => (
+        <ul>
+            {items.map((item) => (
+                <li key={item.id} aria-label={item.name}>
+                    <span data-testid="status">{item.status}</span>
+                    <button onClick={() => onItemRename(item, `${item.name} (renamed)`)}>
+                        rename
+                    </button>
+                    <button onClick={() => onItemDelete(item)}>delete</button>
+                    <button onClick={() => onStatusChange(item, 'done')}>move to done</button>
+                </li>
+            ))}
+        </ul>
+    ),
+}));
+
+const columns: Column[] = [
+    { id: 'c-todo', name: 'To Do', order: 0 },
+    { id: 'c-doing', name: 'Doing', order: 1 },
+    { id: 'c-done', name: 'Done', order: 2 },
+];
+
+const tasks: Task[] = [
+    { id: '1', title: 'Buy milk', order: 0, columnId: 'c-todo' },
+    { id: '2', title: 'Walk dog', order: 0, columnId: 'c-done' },
+];
+
+const card = (name: string) => screen.getByRole('listitem', { name });
+const statusOf = (name: string) => within(card(name)).getByTestId('status');
 
 describe('TodoList', () => {
     beforeEach(() => {
-        vi.stubGlobal('fetch', vi.fn());
+        vi.mocked(getColumns).mockResolvedValue(columns);
+        vi.mocked(getTasks).mockResolvedValue(tasks);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
-    test('shows a loading message before items arrive', () => {
-        (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
-
-        render(<TodoList />);
-
-        expect(screen.getByText('Loading...')).toBeInTheDocument();
+    afterEach(() => {
+        vi.resetAllMocks();
+        vi.restoreAllMocks();
     });
 
-    test('fetches and renders the items', async () => {
-        (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-            json: () =>
-                Promise.resolve([
-                    { id: '1', name: 'Buy milk', completed: false },
-                    { id: '2', name: 'Walk dog', completed: true },
-                ]),
-        });
+    test('shows a loading message before tasks arrive', () => {
+        vi.mocked(getTasks).mockReturnValue(new Promise(() => {}));
 
-        render(<TodoList />);
+        render(<TodoList projectId="p1" />);
 
-        expect(await screen.findByText('Buy milk')).toBeInTheDocument();
-        expect(screen.getByText('Walk dog')).toBeInTheDocument();
-        expect(fetch).toHaveBeenCalledWith('/api/items');
+        expect(screen.getByText('Chargement…')).toBeInTheDocument();
     });
 
-    test('shows an empty-state message when there are no items', async () => {
-        (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-            json: () => Promise.resolve([]),
-        });
+    test('fetches columns and tasks for the project and maps them to items', async () => {
+        render(<TodoList projectId="p1" />);
 
-        render(<TodoList />);
+        expect(await screen.findByRole('listitem', { name: 'Buy milk' })).toBeInTheDocument();
+        expect(getColumns).toHaveBeenCalledWith('p1');
+        expect(getTasks).toHaveBeenCalledWith('p1');
+        expect(statusOf('Buy milk')).toHaveTextContent('todo');
+        expect(statusOf('Walk dog')).toHaveTextContent('done');
+    });
+
+    test('a task in an unknown column falls back to "todo"', async () => {
+        vi.mocked(getTasks).mockResolvedValue([
+            { id: '3', title: 'Orphan', order: 0, columnId: 'gone' },
+        ]);
+
+        render(<TodoList projectId="p1" />);
+
+        await screen.findByRole('listitem', { name: 'Orphan' });
+        expect(statusOf('Orphan')).toHaveTextContent('todo');
+    });
+
+    test('shows an error message when loading fails', async () => {
+        vi.mocked(getTasks).mockRejectedValue(new ApiError(404, 'HTTP error: 404'));
+
+        render(<TodoList projectId="p1" />);
 
         expect(
-            await screen.findByText('No items yet! Add one above!'),
+            await screen.findByText('The requested resource was not found.'),
         ).toBeInTheDocument();
     });
 
-    test('adding an item appends it to the list', async () => {
+    test('adding a task appends it to the board in the first column', async () => {
         const user = userEvent.setup();
-        (fetch as ReturnType<typeof vi.fn>).mockImplementation(
-            (url: string, options?: RequestInit) => {
-                if (!options) {
-                    return Promise.resolve({ json: () => Promise.resolve([]) });
-                }
+        vi.mocked(createTask).mockResolvedValue({
+            id: '9',
+            title: 'New task',
+            order: 1,
+            columnId: 'c-todo',
+        });
 
-                return Promise.resolve({
-                    json: () =>
-                        Promise.resolve({ id: '9', name: 'New item', completed: false }),
-                });
-            },
-        );
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
 
-        render(<TodoList />);
-
-        await screen.findByText('No items yet! Add one above!');
-
-        await user.type(screen.getByPlaceholderText('New Item'), 'New item');
+        await user.type(screen.getByPlaceholderText('New Item'), 'New task');
         await user.click(screen.getByRole('button', { name: /add item/i }));
 
-        expect(await screen.findByText('New item')).toBeInTheDocument();
+        expect(createTask).toHaveBeenCalledWith('p1', {
+            title: 'New task',
+            columnId: 'c-todo',
+        });
+        expect(await screen.findByRole('listitem', { name: 'New task' })).toBeInTheDocument();
+        expect(statusOf('New task')).toHaveTextContent('todo');
     });
 
-    test('toggling an item updates it in place', async () => {
+    test('renaming updates the task optimistically', async () => {
         const user = userEvent.setup();
-        (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-            if (url === '/api/items') {
-                return Promise.resolve({
-                    json: () =>
-                        Promise.resolve([
-                            { id: '1', name: 'Buy milk', completed: false },
-                        ]),
-                });
-            }
+        vi.mocked(updateTask).mockResolvedValue({ ...tasks[0], title: 'Buy milk (renamed)' });
 
-            return Promise.resolve({
-                json: () =>
-                    Promise.resolve({ id: '1', name: 'Buy milk', completed: true }),
-            });
-        });
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
 
-        render(<TodoList />);
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'rename' }));
 
-        await screen.findByText('Buy milk');
-        await user.click(
-            screen.getByRole('button', { name: 'Mark item as complete' }),
-        );
+        expect(updateTask).toHaveBeenCalledWith('p1', '1', { title: 'Buy milk (renamed)' });
+        expect(card('Buy milk (renamed)')).toBeInTheDocument();
+    });
+
+    test('a failed rename is rolled back and reported', async () => {
+        const user = userEvent.setup();
+        vi.mocked(updateTask).mockRejectedValue(new ApiError(500, 'HTTP error: 500'));
+
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
+
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'rename' }));
 
         expect(
-            await screen.findByRole('button', {
-                name: 'Mark item as incomplete',
-            }),
+            await screen.findByText('The server encountered an error.'),
         ).toBeInTheDocument();
+        expect(card('Buy milk')).toBeInTheDocument();
+        expect(screen.queryByRole('listitem', { name: 'Buy milk (renamed)' })).not.toBeInTheDocument();
     });
 
-    test('removing an item drops it from the list', async () => {
+    test('deleting removes the task once the server confirms', async () => {
         const user = userEvent.setup();
-        (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-            if (url === '/api/items') {
-                return Promise.resolve({
-                    json: () =>
-                        Promise.resolve([
-                            { id: '1', name: 'Buy milk', completed: false },
-                        ]),
-                });
-            }
+        vi.mocked(deleteTask).mockResolvedValue();
 
-            return Promise.resolve({});
-        });
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
 
-        render(<TodoList />);
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'delete' }));
 
-        await screen.findByText('Buy milk');
-        await user.click(screen.getByRole('button', { name: 'Remove Item' }));
-
+        expect(deleteTask).toHaveBeenCalledWith('p1', '1');
         await waitFor(() =>
-            expect(screen.queryByText('Buy milk')).not.toBeInTheDocument(),
+            expect(screen.queryByRole('listitem', { name: 'Buy milk' })).not.toBeInTheDocument(),
         );
+        expect(card('Walk dog')).toBeInTheDocument();
+    });
+
+    test('a failed delete keeps the task and reports the error', async () => {
+        const user = userEvent.setup();
+        vi.mocked(deleteTask).mockRejectedValue(new ApiError(400, 'HTTP error: 400'));
+
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
+
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'delete' }));
+
+        expect(await screen.findByText('The request is invalid.')).toBeInTheDocument();
+        expect(card('Buy milk')).toBeInTheDocument();
+    });
+
+    test('moving a task sends it to the end of the target column', async () => {
+        const user = userEvent.setup();
+        vi.mocked(moveTask).mockResolvedValue({ ...tasks[0], columnId: 'c-done', order: 1 });
+
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
+
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'move to done' }));
+
+        // "Walk dog" is already in Done, so the moved task goes to position 1.
+        expect(moveTask).toHaveBeenCalledWith('p1', '1', 'c-done', 1);
+        expect(statusOf('Buy milk')).toHaveTextContent('done');
+    });
+
+    test('a failed move is rolled back and reported', async () => {
+        const user = userEvent.setup();
+        vi.mocked(moveTask).mockRejectedValue(new TypeError('Failed to fetch'));
+
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
+
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'move to done' }));
+
         expect(
-            screen.getByText('No items yet! Add one above!'),
+            await screen.findByText('Unable to connect to the server.'),
         ).toBeInTheDocument();
+        expect(statusOf('Buy milk')).toHaveTextContent('todo');
+    });
+
+    test('moving is a no-op when the project lacks the target column', async () => {
+        const user = userEvent.setup();
+        vi.mocked(getColumns).mockResolvedValue([columns[0]]);
+
+        render(<TodoList projectId="p1" />);
+        await screen.findByRole('listitem', { name: 'Buy milk' });
+
+        await user.click(within(card('Buy milk')).getByRole('button', { name: 'move to done' }));
+
+        expect(moveTask).not.toHaveBeenCalled();
+        expect(statusOf('Buy milk')).toHaveTextContent('todo');
     });
 });
