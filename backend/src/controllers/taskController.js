@@ -1,6 +1,4 @@
 const taskService = require('../services/taskService');
-const { EVENTS } = require("../events/events");
-const { publishEvent } = require("../events/eventBus");
 
 async function getTasks(req, res) {
   const tasks = await taskService.getTasks();
@@ -17,8 +15,7 @@ async function getTask(req, res) {
 async function createTask(req, res) {
   const task = await taskService.createTask(req.body);
 
-  publishEvent(EVENTS.TASK_CREATED, task);
-
+  
   res.status(201).json(task);
 }
 
