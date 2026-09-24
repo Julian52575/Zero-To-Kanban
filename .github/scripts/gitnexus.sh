@@ -73,7 +73,7 @@ see. Consumers are matched by URL, so they apply to every method on the row.
 
 $table
 EOF
-  echo "wrote ${out#"$root"/}" >&2
+  echo -e "wrote ${out#"$root"/}\ngit add ${out#"$root"/}; git commit -m 'docs(api-links): updated gitnexus/api-links.md' " >&2
 }
 
 case "${1:-}" in
