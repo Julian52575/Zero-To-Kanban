@@ -31,8 +31,27 @@ spec:
       {{- end }}
       # Makes the volume writable by the non-root rabbitmq user, like the
       # `:U` volume flag in docker-compose.yml.
+      # Without OnRootMismatch the kubelet re-applies fsGroup recursively on
+      # every mount, adding group rw to .erlang.cookie, which Erlang then
+      # refuses ("must be accessible by owner only").
       securityContext:
         fsGroup: {{ .Values.rabbitmq.securityContext.runAsGroup }}
+        fsGroupChangePolicy: OnRootMismatch
+      # Repairs a cookie already loosened by an earlier mount (e.g. after an
+      # eviction); the fsGroup policy above only prevents it from now on.
+      initContainers:
+        - name: fix-cookie-mode
+          image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
+          imagePullPolicy: {{ .Values.rabbitmq.image.pullPolicy }}
+          securityContext:
+            {{- toYaml (merge (deepCopy .Values.rabbitmq.securityContext) .Values.securityContext) | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - '[ ! -f /var/lib/rabbitmq/.erlang.cookie ] || chmod 600 /var/lib/rabbitmq/.erlang.cookie'
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
       containers:
         - name: rabbitmq
           image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
