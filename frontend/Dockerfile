@@ -2,10 +2,10 @@ FROM node:24-slim
 
 WORKDIR /app
 
-COPY package.json package-lock.json .
+COPY package.json package-lock.json ./
 
-RUN npm install
-RUN npm i -g serve
+RUN npm ci \
+ && npm i -g serve
 
 COPY . .
 RUN npm run build

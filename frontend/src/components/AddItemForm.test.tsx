@@ -34,7 +34,7 @@ describe('AddItemForm', () => {
         await user.type(screen.getByPlaceholderText('New Item'), 'Buy milk');
         await user.click(screen.getByRole('button', { name: /add item/i }));
 
-        expect(fetch).toHaveBeenCalledWith('/items', {
+        expect(fetch).toHaveBeenCalledWith('/api/items', {
             method: 'POST',
             body: JSON.stringify({ name: 'Buy milk' }),
             headers: { 'Content-Type': 'application/json' },

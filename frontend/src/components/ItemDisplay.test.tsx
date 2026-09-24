@@ -61,7 +61,7 @@ describe('ItemDisplay', () => {
             screen.getByRole('button', { name: 'Mark item as complete' }),
         );
 
-        expect(fetch).toHaveBeenCalledWith('/items/1', {
+        expect(fetch).toHaveBeenCalledWith('/api/items/1', {
             method: 'PUT',
             body: JSON.stringify({ name: 'Buy milk', completed: true }),
             headers: { 'Content-Type': 'application/json' },
@@ -88,7 +88,7 @@ describe('ItemDisplay', () => {
 
         await user.click(screen.getByRole('button', { name: 'Remove Item' }));
 
-        expect(fetch).toHaveBeenCalledWith('/items/1', { method: 'DELETE' });
+        expect(fetch).toHaveBeenCalledWith('/api/items/1', { method: 'DELETE' });
 
         await waitFor(() => expect(onItemRemoval).toHaveBeenCalledWith(item));
     });
