@@ -28,7 +28,7 @@ async function connectRabbitMQ() {
     console.error("RabbitMQ connection closed. Attempting to reconnect...");
     channel = undefined;
     connection = undefined;
-    setTimeout(() => reconnectRabbitMQ(port), 5000);
+    setTimeout(() => reconnectRabbitMQ(), 5000);
   });
 
   connection.on("error", (err) => {
@@ -36,12 +36,12 @@ async function connectRabbitMQ() {
   });
 }
 
-async function reconnectRabbitMQ(port) {
+async function reconnectRabbitMQ() {
   if (reconnecting || shuttingDown) return;
   reconnecting = true;
   try {
     console.log("Trying to reconnect to RabbitMQ...");
-    await connectRabbitMQ(port);
+    await connectRabbitMQ();
     const { restartConsumers } = require("./eventBus");
     await restartConsumers();
     console.log("Reconnected to RabbitMQ and restarted consumers.");
@@ -49,7 +49,7 @@ async function reconnectRabbitMQ(port) {
   } catch (err) {
     console.error("Failed to reconnect to RabbitMQ:", err);
     reconnecting = false;
-    setTimeout(() => reconnectRabbitMQ(port), 5000);
+    setTimeout(() => reconnectRabbitMQ(), 5000);
   }
 }
 

@@ -131,7 +131,6 @@ describe('projectController', () => {
             });
         });
     });
-});
 
     describe('updateProject', () => {
         it('should update a project, publish the event and return it', async () => {

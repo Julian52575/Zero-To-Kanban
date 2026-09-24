@@ -5,161 +5,42 @@ const taskStatusUpdatedSchema = require('../../src/events/schemas/taskStatusUpda
 describe('Task event schemas', () => {
     const validTask = {
         taskId: 'task-1',
-        projectId: 'project-1',
         name: 'Ma tâche',
-        status: 'TODO',
-        priority: 1,
-        deadline: '2026-12-31',
+        completed: false,
     };
 
-    describe('taskCreatedSchema', () => {
+    describe.each([
+        ['taskCreatedSchema', taskCreatedSchema],
+        ['taskUpdatedSchema', taskUpdatedSchema],
+    ])('%s', (_, schema) => {
         it('should accept a valid task', () => {
-            const result = taskCreatedSchema.safeParse(validTask);
-
-            expect(result.success).toBe(true);
+            expect(schema.safeParse(validTask).success).toBe(true);
         });
 
-        it('should accept null deadline', () => {
-            const result = taskCreatedSchema.safeParse({
-                ...validTask,
-                deadline: null,
-            });
-
-            expect(result.success).toBe(true);
-        });
-
-        it('should accept all statuses', () => {
-            for (const status of [
-                'TODO',
-                'IN_PROGRESS',
-                'DONE',
-            ]) {
-                const result = taskCreatedSchema.safeParse({
-                    ...validTask,
-                    status,
-                });
-
-                expect(result.success).toBe(true);
-            }
-        });
-
-        it('should reject missing taskId', () => {
-            const { taskId, ...data } = validTask;
-
+        it('should accept a completed task', () => {
             expect(
-                taskCreatedSchema.safeParse(data).success,
-            ).toBe(false);
-        });
-
-        it('should reject missing projectId', () => {
-            const { projectId, ...data } = validTask;
-
-            expect(
-                taskCreatedSchema.safeParse(data).success,
-            ).toBe(false);
-        });
-
-        it('should reject missing name', () => {
-            const { name, ...data } = validTask;
-
-            expect(
-                taskCreatedSchema.safeParse(data).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid status', () => {
-            expect(
-                taskCreatedSchema.safeParse({
-                    ...validTask,
-                    status: 'INVALID',
-                }).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid priority', () => {
-            expect(
-                taskCreatedSchema.safeParse({
-                    ...validTask,
-                    priority: 'high',
-                }).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid deadline', () => {
-            expect(
-                taskCreatedSchema.safeParse({
-                    ...validTask,
-                    deadline: 123,
-                }).success,
-            ).toBe(false);
-        });
-
-        it('should reject unknown fields', () => {
-            expect(
-                taskCreatedSchema.safeParse({
-                    ...validTask,
-                    unknown: true,
-                }).success,
-            ).toBe(false);
-        });
-    });
-
-    describe('taskUpdatedSchema', () => {
-        it('should accept a valid task', () => {
-            expect(
-                taskUpdatedSchema.safeParse(validTask).success,
+                schema.safeParse({ ...validTask, completed: true }).success,
             ).toBe(true);
         });
 
-        it('should accept null deadline', () => {
-            expect(
-                taskUpdatedSchema.safeParse({
-                    ...validTask,
-                    deadline: null,
-                }).success,
-            ).toBe(true);
-        });
+        it.each(['taskId', 'name', 'completed'])(
+            'should reject missing %s',
+            (field) => {
+                const { [field]: _omitted, ...data } = validTask;
 
-        it('should reject missing taskId', () => {
-            const { taskId, ...data } = validTask;
+                expect(schema.safeParse(data).success).toBe(false);
+            },
+        );
 
+        it('should reject a non-string taskId', () => {
             expect(
-                taskUpdatedSchema.safeParse(data).success,
+                schema.safeParse({ ...validTask, taskId: 1 }).success,
             ).toBe(false);
         });
 
-        it('should reject missing projectId', () => {
-            const { projectId, ...data } = validTask;
-
+        it('should reject a non-boolean completed', () => {
             expect(
-                taskUpdatedSchema.safeParse(data).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid status', () => {
-            expect(
-                taskUpdatedSchema.safeParse({
-                    ...validTask,
-                    status: 'INVALID',
-                }).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid priority', () => {
-            expect(
-                taskUpdatedSchema.safeParse({
-                    ...validTask,
-                    priority: '1',
-                }).success,
-            ).toBe(false);
-        });
-
-        it('should reject invalid deadline', () => {
-            expect(
-                taskUpdatedSchema.safeParse({
-                    ...validTask,
-                    deadline: 123,
-                }).success,
+                schema.safeParse({ ...validTask, completed: 'yes' }).success,
             ).toBe(false);
         });
     });
