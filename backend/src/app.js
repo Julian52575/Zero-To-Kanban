@@ -1,5 +1,11 @@
 const express = require('express');
 
+const getTasks = require('./routes/task/getTasks');
+const getTask = require('./routes/task/getTask');
+const addTask = require('./routes/task/addTask');
+const updateTask = require('./routes/task/updateTask');
+const deleteTask = require('./routes/task/deleteTask');
+
 const getItems = require("./routes/item/getItems");
 const getItem = require("./routes/item/getItem");
 const addItem = require('./routes/item/addItem');
@@ -40,9 +46,6 @@ apiRouter.delete('/items/:id', deleteItem);
 
 apiRouter.get('/projects', getProjects);
 apiRouter.get('/projects/:id', getProject);
-console.log('validateCreateProject:', typeof validateCreateProject);
-console.log('createProject:', typeof createProject);
-console.log('createProject value:', createProject);
 apiRouter.post('/projects', validateCreateProject, createProject);
 apiRouter.delete('/projects/:id', deleteProject);
 apiRouter.put('/projects/:id', updateProject);

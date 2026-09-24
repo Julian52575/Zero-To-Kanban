@@ -1,4 +1,4 @@
-const { v4: uuid } = require("uuid");
+const { randomUUID: uuid } = require("crypto");
 const projectRepository = require("../repositories/projectRepository");
 
 async function createProject(data) {
