@@ -19,6 +19,7 @@ describe('projectService', () => {
 
             const result = await projectService.createProject({
                 name: '  Mon projet  ',
+                ownerId: 'owner-id',
             });
 
             expect(projectRepository.create).toHaveBeenCalledTimes(1);
@@ -32,6 +33,7 @@ describe('projectService', () => {
             expect(projectPassedToRepository.name).toBe(
                 'Mon projet'
             );
+            expect(projectPassedToRepository.ownerId).toBe('owner-id');
 
             expect(result).toEqual(createdProject);
         });
@@ -52,30 +54,31 @@ describe('projectService', () => {
 
             projectRepository.getAll.mockResolvedValue(projects);
 
-            const result = await projectService.getProjects();
+            const result = await projectService.getProjects('owner-id');
 
-            expect(projectRepository.getAll).toHaveBeenCalledTimes(1);
+            expect(projectRepository.getAll).toHaveBeenCalledWith('owner-id');
             expect(result).toEqual(projects);
         });
     });
 
-    describe('getProject', () => {
-        it('should return a project by its id', async () => {
-            const project = {
-                id: 'project-id',
-                name: 'Mon projet',
-            };
+    const project = {
+        id: 'project-id',
+        name: 'Mon projet',
+        ownerId: 'owner-id',
+    };
 
+    describe('getProject', () => {
+        it("should return the owner's project", async () => {
             projectRepository.getById.mockResolvedValue(project);
 
             const result = await projectService.getProject(
-                'project-id'
+                'project-id',
+                'owner-id'
             );
 
             expect(projectRepository.getById).toHaveBeenCalledWith(
                 'project-id'
             );
-
             expect(result).toEqual(project);
         });
 
@@ -83,11 +86,19 @@ describe('projectService', () => {
             projectRepository.getById.mockResolvedValue(null);
 
             const result = await projectService.getProject(
-                'unknown-id'
+                'unknown-id',
+                'owner-id'
             );
 
-            expect(projectRepository.getById).toHaveBeenCalledWith(
-                'unknown-id'
+            expect(result).toBeNull();
+        });
+
+        it("should return null for someone else's project", async () => {
+            projectRepository.getById.mockResolvedValue(project);
+
+            const result = await projectService.getProject(
+                'project-id',
+                'intruder-id'
             );
 
             expect(result).toBeNull();
@@ -95,72 +106,93 @@ describe('projectService', () => {
     });
 
     describe('updateProject', () => {
-        it('should save the project with a trimmed name', async () => {
-            const project = {
-                id: 'project-id',
-                name: 'Ancien nom',
-            };
-            const updatedProject = {
-                id: 'project-id',
-                name: 'Nouveau nom',
-            };
+        it('should save a trimmed name and return both versions', async () => {
+            const updatedProject = { ...project, name: 'Nouveau nom' };
 
             projectRepository.getById.mockResolvedValue(project);
             projectRepository.update.mockResolvedValue(updatedProject);
 
             const result = await projectService.updateProject(
                 'project-id',
+                'owner-id',
                 { name: '  Nouveau nom  ' }
             );
 
-            expect(projectRepository.update).toHaveBeenCalledWith({
-                id: 'project-id',
-                name: 'Nouveau nom',
+            expect(projectRepository.update).toHaveBeenCalledWith(
+                'project-id',
+                { name: 'Nouveau nom' }
+            );
+            expect(result).toEqual({
+                before: project,
+                after: updatedProject,
             });
-
-            expect(result).toEqual(updatedProject);
         });
 
-        it('should throw when the project does not exist', async () => {
+        it('should return null when the project does not exist', async () => {
             projectRepository.getById.mockResolvedValue(null);
 
-            await expect(
-                projectService.updateProject('unknown-id', {
-                    name: 'Nouveau nom',
-                })
-            ).rejects.toThrow('Project not found');
-
-            expect(projectRepository.getById).toHaveBeenCalledWith(
-                'unknown-id'
+            const result = await projectService.updateProject(
+                'unknown-id',
+                'owner-id',
+                { name: 'Nouveau nom' }
             );
+
+            expect(result).toBeNull();
+            expect(projectRepository.update).not.toHaveBeenCalled();
+        });
+
+        it("should not update someone else's project", async () => {
+            projectRepository.getById.mockResolvedValue(project);
+
+            const result = await projectService.updateProject(
+                'project-id',
+                'intruder-id',
+                { name: 'Nouveau nom' }
+            );
+
+            expect(result).toBeNull();
+            expect(projectRepository.update).not.toHaveBeenCalled();
         });
     });
 
     describe('deleteProject', () => {
-        it('should delete an existing project', async () => {
-            projectRepository.getById.mockResolvedValue({
-                id: 'project-id',
-                name: 'Mon projet',
-            });
-            projectRepository.delete.mockResolvedValue();
+        it("should delete the owner's project", async () => {
+            projectRepository.getById.mockResolvedValue(project);
+            projectRepository.deleteProject.mockResolvedValue(project);
 
-            await projectService.deleteProject('project-id');
+            const result = await projectService.deleteProject(
+                'project-id',
+                'owner-id'
+            );
 
-            expect(projectRepository.delete).toHaveBeenCalledWith(
+            expect(projectRepository.deleteProject).toHaveBeenCalledWith(
                 'project-id'
             );
+            expect(result).toEqual(project);
         });
 
-        it('should throw when the project does not exist', async () => {
+        it('should return null when the project does not exist', async () => {
             projectRepository.getById.mockResolvedValue(null);
 
-            await expect(
-                projectService.deleteProject('unknown-id')
-            ).rejects.toThrow('Project not found');
-
-            expect(projectRepository.getById).toHaveBeenCalledWith(
-                'unknown-id'
+            const result = await projectService.deleteProject(
+                'unknown-id',
+                'owner-id'
             );
+
+            expect(result).toBeNull();
+            expect(projectRepository.deleteProject).not.toHaveBeenCalled();
+        });
+
+        it("should not delete someone else's project", async () => {
+            projectRepository.getById.mockResolvedValue(project);
+
+            const result = await projectService.deleteProject(
+                'project-id',
+                'intruder-id'
+            );
+
+            expect(result).toBeNull();
+            expect(projectRepository.deleteProject).not.toHaveBeenCalled();
         });
     });
 });

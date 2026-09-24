@@ -10,6 +10,7 @@ const mockPrismaInstance = {
     },
     project: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -101,29 +102,51 @@ describe('persistence', () => {
         });
     });
 
-    test('createProject creates a project with the given fields', async () => {
-        const project = { id: 'p1', name: 'Projet' };
+    test('createProject creates a project with its default columns', async () => {
+        const project = { id: 'p1', name: 'Projet', ownerId: 'u1' };
         mockPrismaInstance.project.create.mockResolvedValue(project);
 
         const result = await db.createProject(project);
 
         expect(mockPrismaInstance.project.create).toHaveBeenCalledWith({
-            data: { id: 'p1', name: 'Projet' },
+            data: {
+                id: 'p1',
+                name: 'Projet',
+                ownerId: 'u1',
+                columns: {
+                    create: [
+                        { name: 'À faire', order: 0 },
+                        { name: 'En cours', order: 1 },
+                        { name: 'Terminé', order: 2 },
+                    ],
+                },
+            },
+            include: { columns: { orderBy: { order: 'asc' } } },
         });
         expect(result).toEqual(project);
     });
 
-    test('getProjects returns every project', async () => {
+    test("getProjects returns the user's projects", async () => {
         const projects = [{ id: 'p1', name: 'Projet' }];
         mockPrismaInstance.project.findMany.mockResolvedValue(projects);
 
-        const result = await db.getProjects();
+        const result = await db.getProjects('u1');
 
-        expect(mockPrismaInstance.project.findMany).toHaveBeenCalledTimes(1);
+        expect(mockPrismaInstance.project.findMany).toHaveBeenCalledWith({
+            where: { ownerId: 'u1' },
+            orderBy: { createdAt: 'desc' },
+        });
         expect(result).toEqual(projects);
     });
 
-    test('getProject returns a single project by id', async () => {
+    test('getProjects refuses to list without a user', async () => {
+        await expect(db.getProjects()).rejects.toThrow(
+            'getProjects: userId is required'
+        );
+        expect(mockPrismaInstance.project.findMany).not.toHaveBeenCalled();
+    });
+
+    test('getProject returns a single project with its columns', async () => {
         const project = { id: 'p1', name: 'Projet' };
         mockPrismaInstance.project.findUnique.mockResolvedValue(project);
 
@@ -131,6 +154,7 @@ describe('persistence', () => {
 
         expect(mockPrismaInstance.project.findUnique).toHaveBeenCalledWith({
             where: { id: 'p1' },
+            include: { columns: { orderBy: { order: 'asc' } } },
         });
         expect(result).toEqual(project);
     });
@@ -139,22 +163,47 @@ describe('persistence', () => {
         const project = { id: 'p1', name: 'Nouveau nom' };
         mockPrismaInstance.project.update.mockResolvedValue(project);
 
-        const result = await db.updateProject(project);
+        const result = await db.updateProject('p1', { name: 'Nouveau nom' });
 
         expect(mockPrismaInstance.project.update).toHaveBeenCalledWith({
             where: { id: 'p1' },
             data: { name: 'Nouveau nom' },
+            include: { columns: { orderBy: { order: 'asc' } } },
         });
         expect(result).toEqual(project);
     });
 
-    test('removeProject deletes a project by id', async () => {
+    test('deleteProject deletes a project by id', async () => {
         mockPrismaInstance.project.delete.mockResolvedValue();
 
-        await db.removeProject('p1');
+        await db.deleteProject('p1');
 
         expect(mockPrismaInstance.project.delete).toHaveBeenCalledWith({
             where: { id: 'p1' },
         });
     });
+
+    test('userCanAccessProject matches the project on its owner', async () => {
+        mockPrismaInstance.project.findFirst.mockResolvedValue({ id: 'p1' });
+
+        await expect(db.userCanAccessProject('u1', 'p1')).resolves.toBe(true);
+        expect(mockPrismaInstance.project.findFirst).toHaveBeenCalledWith({
+            where: { id: 'p1', ownerId: 'u1' },
+            select: { id: true },
+        });
+    });
+
+    test.each([
+        ['u1', undefined],
+        [undefined, 'p1'],
+    ])(
+        'userCanAccessProject(%s, %s) denies without querying',
+        async (userId, projectId) => {
+            // Prisma would drop the undefined filter and match any project.
+            await expect(
+                db.userCanAccessProject(userId, projectId)
+            ).resolves.toBe(false);
+            expect(mockPrismaInstance.project.findFirst).not.toHaveBeenCalled();
+        }
+    );
 });

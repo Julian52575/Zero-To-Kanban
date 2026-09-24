@@ -8,124 +8,108 @@ const { publishEvent } = require('../../src/events/eventBus');
 const { EVENTS } = require('../../src/events/events');
 const projectController = require('../../src/controllers/projectController');
 
+const OWNER_ID = '3f9a4c1e-2b7d-4e8a-9c6f-1d2e3f4a5b6c';
+const PROJECT_ID = '8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+const CREATED_AT = '2026-09-24T10:00:00.000Z';
+
+const project = {
+    id: PROJECT_ID,
+    name: 'Mon projet',
+    createdAt: new Date(CREATED_AT),
+    ownerId: OWNER_ID,
+    columns: [{ id: 'col-1', name: 'À faire', order: 0 }],
+};
+
+// What projectPayload publishes for `project`.
+const published = (p) => ({ ...p, createdAt: CREATED_AT });
+
+const mockRes = () => ({
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    end: jest.fn(),
+});
+
 describe('projectController', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     describe('createProject', () => {
-        it('should create a project and return 201', async () => {
-            const project = {
-                id: 'project-id',
-                name: 'Mon projet',
-            };
-
+        it('should create a project for the user and return 201', async () => {
             projectService.createProject.mockResolvedValue(project);
 
-            const req = {
-                body: {
-                    name: 'Mon projet',
-                },
-            };
-
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn(),
-            };
+            const req = { userId: OWNER_ID, body: { name: 'Mon projet' } };
+            const res = mockRes();
 
             await projectController.createProject(req, res);
 
-            expect(
-                projectService.createProject
-            ).toHaveBeenCalledWith(req.body);
-
+            expect(projectService.createProject).toHaveBeenCalledWith({
+                name: 'Mon projet',
+                ownerId: OWNER_ID,
+            });
             expect(publishEvent).toHaveBeenCalledWith(
                 EVENTS.PROJECT_CREATED,
-                { projectId: 'project-id', name: 'Mon projet' }
+                published(project)
+            );
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json).toHaveBeenCalledWith(project);
+        });
+
+        it('should still respond when the event cannot be published', async () => {
+            projectService.createProject.mockResolvedValue(project);
+            publishEvent.mockRejectedValueOnce(new Error('broker down'));
+            const errorSpy = jest
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            const res = mockRes();
+            await projectController.createProject(
+                { userId: OWNER_ID, body: { name: 'Mon projet' } },
+                res
             );
 
             expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith(project);
+            errorSpy.mockRestore();
         });
     });
 
     describe('getProjects', () => {
-        it('should return all projects', async () => {
-            const projects = [
-                {
-                    id: '1',
-                    name: 'Projet 1',
-                },
-                {
-                    id: '2',
-                    name: 'Projet 2',
-                },
-            ];
+        it("should return the user's projects", async () => {
+            projectService.getProjects.mockResolvedValue([project]);
 
-            projectService.getProjects.mockResolvedValue(projects);
+            const res = mockRes();
+            await projectController.getProjects({ userId: OWNER_ID }, res);
 
-            const req = {};
-
-            const res = {
-                json: jest.fn(),
-            };
-
-            await projectController.getProjects(req, res);
-
-            expect(
-                projectService.getProjects
-            ).toHaveBeenCalledTimes(1);
-
-            expect(res.json).toHaveBeenCalledWith(projects);
+            expect(projectService.getProjects).toHaveBeenCalledWith(OWNER_ID);
+            expect(res.json).toHaveBeenCalledWith([project]);
         });
     });
 
     describe('getProject', () => {
         it('should return a project by id', async () => {
-            const project = {
-                id: 'project-id',
-                name: 'Mon projet',
-            };
-
             projectService.getProject.mockResolvedValue(project);
 
-            const req = {
-                params: {
-                    id: 'project-id',
-                },
-            };
-
-            const res = {
-                json: jest.fn(),
-            };
+            const req = { userId: OWNER_ID, params: { id: PROJECT_ID } };
+            const res = mockRes();
 
             await projectController.getProject(req, res);
 
-            expect(
-                projectService.getProject
-            ).toHaveBeenCalledWith('project-id');
-
+            expect(projectService.getProject).toHaveBeenCalledWith(
+                PROJECT_ID,
+                OWNER_ID
+            );
             expect(res.json).toHaveBeenCalledWith(project);
         });
 
-        it('should return 404 when project does not exist', async () => {
+        it('should return 404 when the project is not found', async () => {
             projectService.getProject.mockResolvedValue(null);
 
-            const req = {
-                params: {
-                    id: 'unknown-id',
-                },
-            };
-
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn(),
-            };
+            const req = { userId: OWNER_ID, params: { id: 'unknown-id' } };
+            const res = mockRes();
 
             await projectController.getProject(req, res);
 
             expect(res.status).toHaveBeenCalledWith(404);
-
             expect(res.json).toHaveBeenCalledWith({
                 error: 'Project not found',
             });
@@ -133,70 +117,82 @@ describe('projectController', () => {
     });
 
     describe('updateProject', () => {
-        it('should update a project, publish the event and return it', async () => {
-            const project = {
-                id: 'project-id',
-                name: 'Nouveau nom',
-            };
-
-            projectService.updateProject.mockResolvedValue(project);
+        it('should update a project, publish both versions and return it', async () => {
+            const updated = { ...project, name: 'Nouveau nom' };
+            projectService.updateProject.mockResolvedValue({
+                before: project,
+                after: updated,
+            });
 
             const req = {
-                params: {
-                    id: 'project-id',
-                },
-                body: {
-                    name: 'Nouveau nom',
-                },
+                userId: OWNER_ID,
+                params: { id: PROJECT_ID },
+                body: { name: 'Nouveau nom' },
             };
-
-            const res = {
-                json: jest.fn(),
-            };
+            const res = mockRes();
 
             await projectController.updateProject(req, res);
 
-            expect(
-                projectService.updateProject
-            ).toHaveBeenCalledWith('project-id', req.body);
-
-            expect(publishEvent).toHaveBeenCalledWith(
-                EVENTS.PROJECT_UPDATED,
-                { projectId: 'project-id', name: 'Nouveau nom' }
+            expect(projectService.updateProject).toHaveBeenCalledWith(
+                PROJECT_ID,
+                OWNER_ID,
+                req.body
             );
+            expect(publishEvent).toHaveBeenCalledWith(EVENTS.PROJECT_UPDATED, {
+                id: PROJECT_ID,
+                beforeUpdate: published(project),
+                afterUpdate: published(updated),
+            });
+            expect(res.json).toHaveBeenCalledWith(updated);
+        });
 
-            expect(res.json).toHaveBeenCalledWith(project);
+        it('should return 404 without publishing when the project is not found', async () => {
+            projectService.updateProject.mockResolvedValue(null);
+
+            const req = {
+                userId: OWNER_ID,
+                params: { id: 'unknown-id' },
+                body: { name: 'Nouveau nom' },
+            };
+            const res = mockRes();
+
+            await projectController.updateProject(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(404);
+            expect(publishEvent).not.toHaveBeenCalled();
         });
     });
 
     describe('deleteProject', () => {
         it('should delete a project, publish the event and return 200', async () => {
-            projectService.deleteProject.mockResolvedValue();
+            projectService.deleteProject.mockResolvedValue(project);
 
-            const req = {
-                params: {
-                    id: 'project-id',
-                },
-            };
-
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                end: jest.fn(),
-            };
+            const req = { userId: OWNER_ID, params: { id: PROJECT_ID } };
+            const res = mockRes();
 
             await projectController.deleteProject(req, res);
 
-            expect(
-                projectService.deleteProject
-            ).toHaveBeenCalledWith('project-id');
-
-            expect(publishEvent).toHaveBeenCalledWith(
-                EVENTS.PROJECT_DELETED,
-                { projectId: 'project-id' }
+            expect(projectService.deleteProject).toHaveBeenCalledWith(
+                PROJECT_ID,
+                OWNER_ID
             );
-
+            expect(publishEvent).toHaveBeenCalledWith(EVENTS.PROJECT_DELETED, {
+                projectId: PROJECT_ID,
+            });
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.end).toHaveBeenCalledTimes(1);
+        });
+
+        it('should return 404 without publishing when the project is not found', async () => {
+            projectService.deleteProject.mockResolvedValue(null);
+
+            const req = { userId: OWNER_ID, params: { id: 'unknown-id' } };
+            const res = mockRes();
+
+            await projectController.deleteProject(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(404);
+            expect(publishEvent).not.toHaveBeenCalled();
         });
     });
 });

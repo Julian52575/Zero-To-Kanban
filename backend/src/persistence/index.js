@@ -42,7 +42,9 @@ async function removeItem(id) {
   await prisma.todoItem.delete({ where: { id } });
 }
 
+// Prisma drops `undefined` filters, so a missing id would match any row.
 async function userCanAccessProject(userId, projectId) {
+  if (!userId || !projectId) return false;
   const project = await prisma.project.findFirst({
     where: { id: projectId, ownerId: userId },
     select: { id: true },
@@ -51,6 +53,7 @@ async function userCanAccessProject(userId, projectId) {
 }
 
 async function columnBelongsToProject(columnId, projectId) {
+  if (!columnId || !projectId) return false;
   const column = await prisma.column.findFirst({
     where: { id: columnId, projectId },
     select: { id: true },
@@ -133,7 +136,18 @@ async function getProjects(userId) {
 }
 
 async function getProject(id) {
-  return prisma.project.findUnique({ where: { id } });
+  return prisma.project.findUnique({
+    where: { id },
+    include: { columns: { orderBy: { order: "asc" } } },
+  });
+}
+
+async function updateProject(id, data) {
+  return prisma.project.update({
+    where: { id },
+    data: { name: data.name },
+    include: { columns: { orderBy: { order: "asc" } } },
+  });
 }
 
 async function deleteProject(id) {
@@ -165,6 +179,7 @@ module.exports = {
   createProject,
   getProjects,
   getProject,
+  updateProject,
   deleteProject,
 
   prisma,

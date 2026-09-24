@@ -39,9 +39,9 @@ describe('projectRepository', () => {
 
             db.getProjects.mockResolvedValue(projects);
 
-            const result = await projectRepository.getAll();
+            const result = await projectRepository.getAll('user-id');
 
-            expect(db.getProjects).toHaveBeenCalledTimes(1);
+            expect(db.getProjects).toHaveBeenCalledWith('user-id');
             expect(result).toEqual(projects);
         });
     });
@@ -90,20 +90,24 @@ describe('projectRepository', () => {
 
             db.updateProject.mockResolvedValue(project);
 
-            const result = await projectRepository.update(project);
+            const result = await projectRepository.update('project-id', {
+                name: 'Nouveau nom',
+            });
 
-            expect(db.updateProject).toHaveBeenCalledWith(project);
+            expect(db.updateProject).toHaveBeenCalledWith('project-id', {
+                name: 'Nouveau nom',
+            });
             expect(result).toEqual(project);
         });
     });
 
-    describe('delete', () => {
+    describe('deleteProject', () => {
         it('should delete a project by its id', async () => {
-            db.removeProject.mockResolvedValue();
+            db.deleteProject.mockResolvedValue();
 
-            await projectRepository.delete('project-id');
+            await projectRepository.deleteProject('project-id');
 
-            expect(db.removeProject).toHaveBeenCalledWith(
+            expect(db.deleteProject).toHaveBeenCalledWith(
                 'project-id'
             );
         });

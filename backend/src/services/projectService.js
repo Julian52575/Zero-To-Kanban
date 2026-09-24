@@ -15,25 +15,30 @@ async function getProjects(userId) {
   return projectRepository.getAll(userId);
 }
 
-async function getProject(id) {
-  return projectRepository.getById(id);
+// Projects belong to their owner: for anyone else they don't exist (null).
+async function getProject(id, userId) {
+  const project = await projectRepository.getById(id);
+  if (!project || project.ownerId !== userId) {
+    return null;
+  }
+  return project;
 }
 
-async function updateProject(id, data) {
-  const project = await projectRepository.getById(id);
-  if (!project) {
-    throw new Error("Project not found");
+async function updateProject(id, userId, data) {
+  const before = await getProject(id, userId);
+  if (!before) {
+    return null;
   }
 
-  project.name = data.name.trim();
+  const after = await projectRepository.update(id, { name: data.name.trim() });
 
-  return projectRepository.update(project);
+  return { before, after };
 }
 
-async function deleteProject(id) {
-  const project = await projectRepository.getById(id);
+async function deleteProject(id, userId) {
+  const project = await getProject(id, userId);
   if (!project) {
-    throw new Error("Project not found");
+    return null;
   }
 
   return projectRepository.deleteProject(id);

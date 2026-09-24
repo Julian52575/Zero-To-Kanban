@@ -56,8 +56,13 @@ describe("EventBus", () => {
   test("should publish and consume a TASK_CREATED event", async () => {
     const data = {
       taskId: "123",
-      name: "Test task",
-      completed: false,
+      projectId: "456",
+      columnId: "789",
+      title: "Test task",
+      description: null,
+      order: 0,
+      creatorId: "user-1",
+      assigneeId: null,
     };
 
     const handler = jest.fn();

@@ -14,16 +14,8 @@ async function createTask(columnId, creatorId, taskData) {
   return response;
 }
 
-async function updateTask(id, userId, taskData) {
-  if (!(await userCanAccessProject(userId, taskData.projectId))) {
-    return null;
-  }
-  const task = await taskRepository.getById(id);
-  if (!task) {
-    return null;
-  }
-  const response = await taskRepository.update(id, taskData);
-  return response;
+async function updateTask(id, taskData) {
+  return taskRepository.update(id, taskData);
 }
 
 async function deleteTask(id, userId) {
@@ -33,7 +25,7 @@ async function deleteTask(id, userId) {
     return null;
   }
 
-  if (!(await userCanAccessProject(userId, task.projectId))) {
+  if (!(await userCanAccessProject(userId, task.column.projectId))) {
     return false;
   }
 

@@ -1,6 +1,7 @@
 const projectService = require('../services/projectService');
 const { EVENTS } = require("../events/events");
 const { publishEvent } = require("../events/eventBus");
+const { projectPayload } = require("../events/payloads");
 
 async function createProject(req, res) {
     const project = await projectService.createProject({
@@ -8,7 +9,7 @@ async function createProject(req, res) {
         ownerId : req.userId
     });
     try {
-        await publishEvent(EVENTS.PROJECT_CREATED, project);
+        await publishEvent(EVENTS.PROJECT_CREATED, projectPayload(project));
     } catch (error) {
         console.error('Failed to publish PROJECT_CREATED event:', error);
     }
@@ -23,7 +24,7 @@ async function getProjects(req, res) {
 }
 
 async function getProject(req, res) {
-    const project = await projectService.getProject(req.params.id);
+    const project = await projectService.getProject(req.params.id, req.userId);
 
     if (!project) {
         return res.status(404).json({
@@ -34,29 +35,42 @@ async function getProject(req, res) {
 }
 
 async function updateProject(req, res) {
-    const project = await projectService.updateProject(
+    const result = await projectService.updateProject(
         req.params.id,
+        req.userId,
         req.body
     );
+
+    if (!result) {
+        return res.status(404).json({
+            error: 'Project not found',
+        });
+    }
 
     try {
         await publishEvent(EVENTS.PROJECT_UPDATED, {
             id: req.params.id,
-            beforeUpdate: project,
-            afterUpdate: req.body,
+            beforeUpdate: projectPayload(result.before),
+            afterUpdate: projectPayload(result.after),
         });
     } catch (error) {
         console.error('Failed to publish PROJECT_UPDATED event:', error);
     }
 
-    res.json(project);
+    res.json(result.after);
 }
 
 async function deleteProject(req, res) {
-    await projectService.deleteProject(req.params.id);
+    const deleted = await projectService.deleteProject(req.params.id, req.userId);
+
+    if (!deleted) {
+        return res.status(404).json({
+            error: 'Project not found',
+        });
+    }
 
     try {
-        await publishEvent(EVENTS.PROJECT_DELETED, { id: req.params.id });
+        await publishEvent(EVENTS.PROJECT_DELETED, { projectId: req.params.id });
     } catch (error) {
         console.error('Failed to publish PROJECT_DELETED event:', error);
     }

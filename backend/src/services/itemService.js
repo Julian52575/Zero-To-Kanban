@@ -2,7 +2,7 @@ const itemRepository = require("../repositories/itemRepository");
 const { randomUUID: uuid } = require("crypto");
 const { publishEvent } = require("../events/eventBus");
 const { EVENTS } = require("../events/events");
-const { taskPayload } = require("../events/payloads");
+const { itemPayload } = require("../events/payloads");
 
 async function getItems() {
   return itemRepository.getAll();
@@ -20,7 +20,7 @@ async function createItem(data) {
   };
   const createdItem = await itemRepository.create(item);
   try {
-    await publishEvent(EVENTS.TASK_CREATED, taskPayload(createdItem));
+    await publishEvent(EVENTS.TASK_CREATED, itemPayload(createdItem));
   } catch (error) {
     console.error("Failed to publish TASK_CREATED event:", error);
   }
@@ -47,7 +47,7 @@ async function updateItem(id, data) {
 
   const updated = await itemRepository.getById(id);
   try {
-    await publishEvent(EVENTS.TASK_UPDATED, taskPayload(updated));
+    await publishEvent(EVENTS.TASK_UPDATED, itemPayload(updated));
   } catch (error) {
     console.error("Failed to publish TASK_UPDATED event:", error);
   }
