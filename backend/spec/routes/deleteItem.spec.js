@@ -1,5 +1,6 @@
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-id'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'test-id'),
 }));
 
 jest.mock('../../src/repositories/itemRepository', () => ({
@@ -11,7 +12,7 @@ jest.mock('../../src/events/eventBus', () => ({
 }));
 
 const itemRepository = require('../../src/repositories/itemRepository');
-const deleteItem = require('../../src/routes/deleteItem');
+const deleteItem = require('../../src/routes/item/deleteItem');
 
 test('it removes item correctly', async () => {
     const req = {

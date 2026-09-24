@@ -1,5 +1,5 @@
 const itemRepository = require('../repositories/itemRepository');
-const { v4: uuid } = require('uuid');
+const { randomUUID: uuid } = require('crypto');
 
 const { publishEvent } = require('../events/eventBus');
 const { EVENTS } = require("../events/events");

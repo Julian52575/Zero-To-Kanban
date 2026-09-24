@@ -1,5 +1,6 @@
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-id'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'test-id'),
 }));
 
 jest.mock('../../src/repositories/itemRepository', () => ({
@@ -12,7 +13,7 @@ jest.mock('../../src/events/eventBus', () => ({
 }));
 
 const itemRepository = require('../../src/repositories/itemRepository');
-const updateItem = require('../../src/routes/updateItem');
+const updateItem = require('../../src/routes/item/updateItem');
 
 const ITEM = { id: 12345 };
 
