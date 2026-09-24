@@ -1,7 +1,12 @@
 const http = require('http');
 
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-id'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'test-id'),
+}));
+
+jest.mock('../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
 }));
 
 jest.mock('../src/events/eventBus', () => ({

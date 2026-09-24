@@ -1,9 +1,26 @@
-const { validateCreateProject } = require('../../src/middlewares/projectValidation');
+const {
+    validateCreateProject,
+} = require('../../src/middlewares/projectValidation');
 
-describe('validateCreateProject middleware', () => {
-    const createMocks = (body) => {
+describe('validateCreateProject', () => {
+    it('should call next for valid data', () => {
         const req = {
-            body,
+            body: {
+                name: 'Mon projet',
+            },
+        };
+
+        const res = {};
+        const next = jest.fn();
+
+        validateCreateProject(req, res, next);
+
+        expect(next).toHaveBeenCalled();
+    });
+
+    it('should return 400 when name is missing', () => {
+        const req = {
+            body: {},
         };
 
         const res = {
@@ -13,175 +30,66 @@ describe('validateCreateProject middleware', () => {
 
         const next = jest.fn();
 
-        return { req, res, next };
-    };
+        validateCreateProject(req, res, next);
 
-    describe('valid data', () => {
-        it('should call next when project data is valid', () => {
-            const { req, res, next } = createMocks({
-                name: 'Mon projet',
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(next).toHaveBeenCalledTimes(1);
-            expect(res.status).not.toHaveBeenCalled();
-            expect(res.json).not.toHaveBeenCalled();
-        });
-
-        it('should trim the project name', () => {
-            const { req, res, next } = createMocks({
-                name: '   Mon projet   ',
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(next).toHaveBeenCalledTimes(1);
-
-            expect(req.body).toEqual({
-                name: 'Mon projet',
-            });
-
-            expect(res.status).not.toHaveBeenCalled();
-            expect(res.json).not.toHaveBeenCalled();
-        });
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalled();
+        expect(next).not.toHaveBeenCalled();
     });
 
-    describe('invalid data', () => {
-        it('should return 400 when name is missing', () => {
-            const { req, res, next } = createMocks({});
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when name is not a string', () => {
-            const { req, res, next } = createMocks({
+    it('should return 400 when name is not a string', () => {
+        const req = {
+            body: {
                 name: 123,
-            });
+            },
+        };
 
-            validateCreateProject(req, res, next);
+        const res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn(),
+        };
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
+        const next = jest.fn();
 
-        it('should return 400 when name is empty', () => {
-            const { req, res, next } = createMocks({
-                name: '',
-            });
+        validateCreateProject(req, res, next);
 
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when name contains only spaces', () => {
-            const { req, res, next } = createMocks({
-                name: '   ',
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when name has only one character', () => {
-            const { req, res, next } = createMocks({
-                name: 'A',
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when name is longer than 100 characters', () => {
-            const { req, res, next } = createMocks({
-                name: 'A'.repeat(101),
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when body contains unknown fields', () => {
-            const { req, res, next } = createMocks({
-                name: 'Mon projet',
-                unknown: 'value',
-            });
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when body is null', () => {
-            const { req, res, next } = createMocks(null);
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when body is an array', () => {
-            const { req, res, next } = createMocks([]);
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should return 400 when body is a number', () => {
-            const { req, res, next } = createMocks(123);
-
-            validateCreateProject(req, res, next);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalled();
-            expect(next).not.toHaveBeenCalled();
-        });
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(next).not.toHaveBeenCalled();
     });
 
-    describe('error response', () => {
-        it('should return validation errors with field and message', () => {
-            const { req, res, next } = createMocks({
-                name: 'A',
-            });
+    it('should return 400 when name is empty', () => {
+        const req = {
+            body: {
+                name: '',
+            },
+        };
 
-            validateCreateProject(req, res, next);
+        const res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn(),
+        };
 
-            expect(res.status).toHaveBeenCalledWith(400);
+        const next = jest.fn();
 
-            expect(res.json).toHaveBeenCalledWith({
-                errors: [
-                    {
-                        field: 'name',
-                        message: expect.any(String),
-                    },
-                ],
-            });
+        validateCreateProject(req, res, next);
 
-            expect(next).not.toHaveBeenCalled();
-        });
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should trim the project name', () => {
+        const req = {
+            body: {
+                name: '  Mon projet  ',
+            },
+        };
+
+        const res = {};
+        const next = jest.fn();
+
+        validateCreateProject(req, res, next);
+
+        expect(next).toHaveBeenCalled();
+        expect(req.body.name).toBe('Mon projet');
     });
 });

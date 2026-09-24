@@ -55,6 +55,17 @@ async function getProject(id) {
     });
 }
 
+async function updateProject(project) {
+    return prisma.project.update({
+        where: { id: project.id },
+        data: { name: project.name },
+    });
+}
+
+async function removeProject(id) {
+    await prisma.project.delete({ where: { id } });
+}
+
 module.exports = {
     prisma,
     init,
@@ -67,4 +78,6 @@ module.exports = {
     createProject,
     getProjects,
     getProject,
+    updateProject,
+    removeProject,
 };

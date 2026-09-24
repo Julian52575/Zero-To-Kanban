@@ -1,5 +1,6 @@
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'something-not-a-uuid'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'something-not-a-uuid'),
 }));
 
 jest.mock('../../src/repositories/itemRepository', () => ({

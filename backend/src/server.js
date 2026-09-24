@@ -76,6 +76,10 @@ process.on("SIGINT", gracefulShutdown);
 process.on("SIGTERM", gracefulShutdown);
 process.on("SIGUSR2", gracefulShutdown);
 
+// Only true under `node src/server.js`: Jest pins require.main to the test
+// file, so this can't run in a unit test. startServer is tested directly and
+// the entrypoint is exercised by the `stack` CI job.
+/* istanbul ignore next */
 if (require.main === module) {
     startServer();
 }
