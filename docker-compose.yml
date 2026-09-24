@@ -217,14 +217,6 @@ services:
       - traefik.http.routers.frontend.middlewares=strip-identity@docker,require-login@docker
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:4-management
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
 volumes:
   todo-db-data:
   auth-db-data:
