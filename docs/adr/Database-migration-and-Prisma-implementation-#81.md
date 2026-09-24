@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Sachet2Plastik
 - **Opened:** 2026-09-08 14:03Z
-- **Closed:** 2026-09-24 12:45Z
+- **Closed:** 2026-09-24 12:46Z
 
 ### Discussion
 
@@ -398,6 +398,38 @@ Please set Decision to Accepted and close with comment: "/commit 43-61-merge-fro
 Please set Decision to Accepted and close with comment: "/commit 43-61-merge-frontback"
 
 #### @Julian52575 -- 2026-09-24 12:45Z
+
+/commit 43-61-merge-frontback
+
+#### @Sachet2Plastik -- 2026-09-24 12:45Z
+
+/commit 43-61-merge-frontback
+
+#### @Julian52575 -- 2026-09-24 12:45Z
+
+This discussion was committed into `43-61-merge-frontback`: [326d544](https://github.com/Julian52575/Zero-To-Kanban/commit/326d544c5e2dd39c9185cf1ca439c67beaa50eee)
+
+#### @Julian52575 -- 2026-09-24 12:46Z
+
+This discussion cannot be closed yet. Please specify a branch so I can commit the markdown document to it.
+
+### Hint
+
+Either update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and write additional information if needed.
+
+##### Previous `/commit`s are always ignored.
+
+#### @Julian52575 -- 2026-09-24 12:46Z
+
+This discussion cannot be closed yet. Please specify a branch so I can commit the markdown document to it.
+
+### Hint
+
+Either update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and write additional information if needed.
+
+##### Previous `/commit`s are always ignored.
+
+#### @Sachet2Plastik -- 2026-09-24 12:46Z
 
 /commit 43-61-merge-frontback
 
