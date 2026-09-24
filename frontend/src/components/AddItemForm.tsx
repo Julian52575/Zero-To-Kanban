@@ -2,7 +2,6 @@ import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
 import type { Item } from '../types/item';
 import { getErrorMessage } from '../utils/errorMessage';
-import apiClient from '../services/apiClient';
 import { createTask } from '../services/taskService';
 
 interface AddItemFormProps {
@@ -23,14 +22,11 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
 
         setSubmitting(true);
         setError(null);
-        createTask(projectId, { title: newItem.trim(), columnId })
         try {
-            const item: { id: string; title: string } = await apiClient.post('/items', {
-                name: newItem,
-            });
+            const task = await createTask(projectId, { title: newItem.trim(), columnId });
             onNewItem({
-                id: item.id,
-                name: item.title,
+                id: task.id,
+                name: task.title,
                 completed: false,
                 status: 'todo',
             });
@@ -42,7 +38,7 @@ function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
             setSubmitting(false);
         }
     };
-    const isDisabled = submitting || newItem.trim().length === 0;
+    const isDisabled = submitting || !columnId || newItem.trim().length === 0;
 
     return (
         <Form onSubmit={submitNewItem}>
