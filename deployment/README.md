@@ -9,9 +9,9 @@ deployment/
 ├── flake.nix                 dev shell (k3s, kubectl, helm, argocd, just); auto-starts k3s
 ├── justfile                  bootstrap / refresh / teardown recipes
 ├── argocd/
-│   ├── root-app.yaml         app-of-apps for a shared cluster (syncs environments/)
+│   ├── root-app.yaml         app-of-apps for the prod cluster (syncs prod-app.yaml)
 │   └── environments/         one Argo CD Application per environment
-└── helm/zero-to-kanban/      the app chart (auth, backend, frontend, 2x Postgres, Traefik routes)
+└── helm/zero-to-kanban/      the app chart (auth, backend, frontend, RabbitMQ, 2x Postgres, Traefik routes)
 ```
 
 ## Local quick start
@@ -111,17 +111,21 @@ The shell exports `KUBECONFIG` (pointing into the state dir) and `GIT_BRANCH`
 | `auth`     | `ghcr.io/julian52575/zero-to-kanban-auth`     | 4000 | `authdb` (its own Postgres)     |
 | `backend`  | `ghcr.io/julian52575/zero-to-kanban-backend`  | 3000 | `postgresql`                    |
 | `frontend` | `ghcr.io/julian52575/zero-to-kanban-frontend` | 3000 | none                               |
+| `rabbitmq` | `docker.io/library/rabbitmq:4-management`     | 5672, 15672 (UI) | none              |
 
 Both Postgres instances come from the Bitnami `postgresql` chart. Services
-run their own migrations on startup.
+run their own migrations on startup. RabbitMQ carries the backend's domain
+events. It is a single-node StatefulSet using the same image as
+`docker-compose.yml`, with its data on its own volume.
 
 **Startup order:** each pod has a `wait-for-*` init container that holds it
 until the Service it depends on accepts connections. A Service only routes
 to ready pods, so this waits for the dependency's readiness probe to pass:
 
 ```
-postgresql ──▶ backend ──▶ frontend
-authdb     ──▶ auth
+postgresql ──┬▶ backend ──▶ frontend
+rabbitmq   ──┘
+authdb     ────▶ auth
 ```
 
 **Routing** is done by a Traefik `IngressRoute` that matches on path only,
@@ -131,16 +135,16 @@ with no hostname. It is the same routing as `docker-compose.yml`:
 |-------------------------------|-----------------------|----------------------------------------------|
 | `/auth*`, `/login`, `/register` | auth                | public                                       |
 | `/metrics`                    | Traefik's own metrics | separate BasicAuth (`ingress.metrics.auth`)  |
-| `/items*`                     | backend               | login required (ForwardAuth to auth)         |
+| `/api*`                       | backend, `/api` removed from the path | login required (ForwardAuth to auth) |
 | everything else               | frontend              | login required                               |
 
 On protected routes, client-sent `X-Auth-User-*` headers are removed. The
 auth service then sets them after it checks the session.
 
 **Network policies** make Traefik the only way in: auth, backend and
-frontend accept traffic only from the Traefik pods, `postgresql` only from
-backend, and `authdb` only from auth. The one exception is frontend →
-backend, for the startup wait. Kubelet probes, `kubectl exec` and
+frontend accept traffic only from the Traefik pods, `postgresql` and
+`rabbitmq` (AMQP port only) only from backend, and `authdb` only from auth.
+The one exception is frontend → backend, for the startup wait. Kubelet probes, `kubectl exec` and
 `kubectl port-forward` still work. If Traefik runs somewhere other than
 k3s's `kube-system`, set `networkPolicy.ingressController`.
 
@@ -148,6 +152,8 @@ k3s's `kube-system`, set `networkPolicy.ingressController`.
 runs as uid 1000 with a read-only root filesystem, no Linux capabilities,
 no privilege escalation and the default seccomp profile. The images must
 not need root or write to disk (see `securityContext` in `values.yaml`).
+`rabbitmq` gets the same settings but runs as its image's uid 999, and
+writes only to its volume.
 
 **Dev credentials** are plaintext defaults in `values.yaml`, for disposable
 clusters only:
@@ -158,10 +164,21 @@ clusters only:
 | app DB (`postgresql`)     | user `todo`, password `todo`, database `todo`; superuser `postgres` / `postgres` |
 | auth DB (`authdb`)        | user `authuser`, password `authpass`, database `auth`; superuser `postgres` / `postgres` |
 | session signing key       | `dev-only-change-me`                    |
+| RabbitMQ                  | `user` / `dev-only-change-me`           |
 
 The `/metrics` Secret stores only a bcrypt hash, so the password can't be
 read back from the cluster. Get it from `values.yaml` in dev, or from
 whoever created the Secret in prod.
+
+**RabbitMQ management UI:** not routed by Traefik. Forward it, then open
+http://localhost:15672:
+
+```bash
+kubectl -n ztk-dev-k3s port-forward svc/ztk-dev-k3s-local-zero-to-kanban-rabbitmq 15672
+```
+
+RabbitMQ, like Postgres, only takes its user and password when its volume
+is first created.
 
 **Database dumps:** run `pg_dump` inside the database pod as the `postgres`
 superuser. No local Postgres client is needed:
@@ -189,6 +206,7 @@ first created. On an older dev volume, run `just nuke` to reset them.
 | entrypoint / TLS       | `web`, no TLS                        | `websecure`, TLS from Secret `kanban-tls` |
 | `/metrics` route       | on                                   | off                                     |
 | DB volume sizes        | 1Gi / 1Gi                            | 10Gi / 5Gi                              |
+| RabbitMQ volume size   | 1Gi                                  | 2Gi                                     |
 
 Postgres images are pinned in `values.yaml` to `bitnamilegacy/postgresql`,
 because Bitnami removed the versioned tags.
@@ -204,7 +222,7 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 
 | File (in `argocd/environments/`) | App name             | Namespace     | Source                      | Auto-sync | Applied by                   |
 |----------------------------------|----------------------|---------------|-----------------------------|-----------|------------------------------|
-| `dev-app.yaml`                   | `ztk-dev`            | `ztk-dev`     | GitHub `main`, dev values   | yes       | `root-app.yaml`              |
+| `dev-app.yaml`                   | `ztk-dev`            | `ztk-dev`     | GitHub `main`, dev values   | yes       | manual `kubectl apply`, never on the prod cluster |
 | `prod-app.yaml`                  | `ztk-prod`           | `ztk-prod`    | GitHub `main`, prod values  | **no**    | `root-app.yaml`              |
 | `dev-k3s-app.yaml`               | `ztk-dev-k3s`        | `ztk-dev-k3s` | GitHub `main`, dev values   | yes       | `just up-gitops`             |
 | `dev-k3s-local-app.yaml`         | `ztk-dev-k3s-local`  | `ztk-dev-k3s` | local repo, current branch  | yes       | `just up-local` (template, don't apply directly) |
@@ -212,41 +230,178 @@ helm template ztk helm/zero-to-kanban -f helm/zero-to-kanban/values.yaml -f helm
 
 ## Shared / production cluster
 
-1. Install Argo CD in the cluster.
-2. Create the prod Secrets in `ztk-prod`. `values-prod.yaml` only names
-   them, so Argo CD never sees the values. Sealed Secrets or the External
-   Secrets Operator can create them instead of `kubectl`.
+1. Install Argo CD in the cluster, at the version the `justfile` pins
+   (`argocd_version`). Until this is done, applying any Argo CD file fails
+   with `no matches for kind "Application"`.
+
+   ```bash
+   kubectl create namespace argocd
+   # --server-side: the ApplicationSet CRD is too big for client-side apply
+   kubectl apply --server-side -n argocd \
+     -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.3/manifests/install.yaml
+   kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server
+   ```
+
+   The UI isn't public. See [Reaching the internal UIs](#reaching-the-internal-uis)
+   below to open it.
+
+2. Create the prod Secrets in `ztk-prod`, before the first sync.
+   `values-prod.yaml` only names them, so Argo CD never sees the values.
+   Sealed Secrets or the External Secrets Operator can create them instead
+   of `kubectl`. Every password is generated with `openssl rand -hex`, so
+   there is nothing to invent: the database and RabbitMQ passwords are put
+   into connection URLs (`postgresql://user:password@host`) without escaping,
+   and a `@`, `/` or `:` in them would break the connection.
 
    ```bash
    kubectl create namespace ztk-prod
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-auth \
      --from-literal=session-secret="$(openssl rand -hex 32)"
-   # password = app user, postgres-password = `postgres` superuser (pg_dump, admin)
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-postgresql \
-     --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
+     --from-literal=password="$(openssl rand -hex 32)" \
+     --from-literal=postgres-password="$(openssl rand -hex 32)"
    kubectl -n ztk-prod create secret generic zero-to-kanban-prod-authdb \
-     --from-literal=password='<strong>' --from-literal=postgres-password='<strong>'
-   kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
+     --from-literal=password="$(openssl rand -hex 32)" \
+     --from-literal=postgres-password="$(openssl rand -hex 32)"
+   kubectl -n ztk-prod create secret generic zero-to-kanban-prod-rabbitmq \
+     --from-literal=password="$(openssl rand -hex 32)"
    ```
 
-   `/metrics` is off in prod. To turn it on, set `ingress.metrics.enabled: true`
-   and `ingress.metrics.auth.existingSecret: zero-to-kanban-prod-metrics-auth`,
-   then create that Secret. It holds an htpasswd file under the key `users`:
+   Each database Secret holds two passwords, one per Postgres account:
+
+   | Key                 | Account                                   | Used by                  |
+   |---------------------|-------------------------------------------|--------------------------|
+   | `password`          | app user (`todo`, or `authuser` for authdb) | backend / auth, at runtime |
+   | `postgres-password` | `postgres` superuser                      | you: `pg_dump`, admin    |
+
+   No need to write them down. Read one back with:
 
    ```bash
-   htpasswd -nBC 10 metrics | kubectl -n ztk-prod create secret generic \
-     zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
+   kubectl -n ztk-prod get secret zero-to-kanban-prod-postgresql \
+     -o jsonpath='{.data.postgres-password}' | base64 -d; echo
    ```
 
-3. Apply the root app once. It then creates and manages `ztk-dev` and `ztk-prod`:
+   A database only takes its passwords when its volume is first created.
+   Editing the Secret afterwards does not change them.
+
+3. Create the TLS certificate, as a `kubernetes.io/tls` Secret named
+   `kanban-tls` in `ztk-prod`. Pick one:
+
+   - **With a domain name (recommended):** cert-manager gets a free Let's
+     Encrypt certificate and renews it. Point the domain's DNS `A` record at
+     the server, and make sure ports 80 and 443 are open, then:
+
+     ```bash
+     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+     kubectl -n cert-manager rollout status deploy/cert-manager-webhook
+
+     # replace the email and the domain
+     kubectl apply -f - <<'EOF'
+     apiVersion: cert-manager.io/v1
+     kind: ClusterIssuer
+     metadata:
+       name: letsencrypt
+     spec:
+       acme:
+         server: https://acme-v02.api.letsencrypt.org/directory
+         email: you@example.com
+         privateKeySecretRef:
+           name: letsencrypt-account-key
+         solvers:
+           - http01:
+               ingress:
+                 ingressClassName: traefik
+     ---
+     apiVersion: cert-manager.io/v1
+     kind: Certificate
+     metadata:
+       name: kanban-tls
+       namespace: ztk-prod
+     spec:
+       secretName: kanban-tls
+       dnsNames:
+         - kanban.example.com
+       issuerRef:
+         name: letsencrypt
+         kind: ClusterIssuer
+     EOF
+
+     kubectl -n ztk-prod get certificate kanban-tls   # wait for READY=True
+     ```
+
+     If it stays `False`, `kubectl -n ztk-prod describe certificate kanban-tls`
+     says why (usually DNS not pointing at the server yet, or port 80 closed).
+
+   - **Without a domain (IP only):** a self-signed certificate. HTTPS works,
+     but browsers show a warning you have to click through.
+
+     ```bash
+     openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+       -subj "/CN=kanban" -keyout tls.key -out tls.crt
+     kubectl -n ztk-prod create secret tls kanban-tls --cert=tls.crt --key=tls.key
+     rm tls.key tls.crt
+     ```
+
+   - **You already have `tls.crt` / `tls.key`** (from your DNS or hosting
+     provider): run only the `kubectl ... create secret tls` line above, from
+     the directory holding them.
+
+4. *(Optional)* `/metrics` is off in prod. To turn it on, set
+   `ingress.metrics.enabled: true` and
+   `ingress.metrics.auth.existingSecret: zero-to-kanban-prod-metrics-auth`,
+   then create that Secret. It holds an htpasswd line under the key `users`.
+   `htpasswd` comes from `apache2-utils` (`sudo apt install apache2-utils`):
+
+   ```bash
+   METRICS_PASSWORD="$(openssl rand -hex 16)"
+   echo "metrics password: $METRICS_PASSWORD"   # save it, it can't be read back
+   htpasswd -nbB metrics "$METRICS_PASSWORD" | kubectl -n ztk-prod create secret \
+     generic zero-to-kanban-prod-metrics-auth --from-file=users=/dev/stdin
+   ```
+
+5. Apply the root app once. It then creates and manages `ztk-prod`. It
+   never creates `ztk-dev`: dev runs on default credentials published in
+   this repo, so it must not share a public cluster with prod.
 
    ```bash
    kubectl apply -n argocd -f argocd/root-app.yaml
    ```
 
-4. **Release to prod:** each GitHub release publishes new images, then
+   If an older root app already created `ztk-dev`, it deletes it on its
+   next sync (`prune: true`).
+
+6. **Release to prod:** each GitHub release publishes new images, then
    `.github/workflows/bump-helm-chart.yml` writes the release tag into
    `values-prod.yaml`, deploys the chart with the prod values into a
    throwaway k3s node, and opens a PR if it becomes ready. Merge the PR, then
    sync `ztk-prod` by hand from the Argo CD UI or with
    `argocd app sync ztk-prod`.
+
+### Reaching the internal UIs
+
+Only the app itself is public (Traefik on ports 80/443). Argo CD, the
+RabbitMQ management UI and the databases are reachable only from inside the
+cluster. Open them with `kubectl port-forward`, from any machine whose
+`kubectl` can reach the cluster:
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8081:443 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-zero-to-kanban-rabbitmq 15672:15672 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-postgresql 15432:5432 &
+kubectl -n ztk-prod port-forward svc/ztk-prod-authdb 15433:5432 &
+wait   # Ctrl+C stops them all
+```
+
+Start only the ones you need. The NetworkPolicies don't block
+`kubectl port-forward`.
+
+| What                  | Local port | URL / client                        | Login |
+|-----------------------|------------|-------------------------------------|-------|
+| Argo CD               | 8081       | https://localhost:8081 (self-signed, accept the warning) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
+| RabbitMQ management   | 15672      | http://localhost:15672              | `user` / `password` key of `zero-to-kanban-prod-rabbitmq` |
+| app DB (`postgresql`) | 15432      | `psql -h localhost -p 15432 -U todo todo` | `password` key of `zero-to-kanban-prod-postgresql` |
+| auth DB (`authdb`)    | 15433      | `psql -h localhost -p 15433 -U authuser auth` | `password` key of `zero-to-kanban-prod-authdb` |
+
+The Secret keys are read back as in step 2, e.g.
+`kubectl -n ztk-prod get secret zero-to-kanban-prod-rabbitmq -o jsonpath='{.data.password}' | base64 -d; echo`.
+Use the `postgres` user and the `postgres-password` key for admin work.

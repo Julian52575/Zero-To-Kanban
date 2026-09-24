@@ -73,6 +73,41 @@ frontend:
       cpu: 250m
       memory: 128Mi
 
+# Message broker for the backend's domain events -- the `rabbitmq` service in
+# docker-compose.yml. Same official image as compose rather than a Bitnami
+# subchart (Bitnami's images lost their versioned tags, see postgresql.image
+# below). Single node, no clustering.
+rabbitmq:
+  image:
+    repository: docker.io/library/rabbitmq
+    tag: 4-management
+    pullPolicy: IfNotPresent
+  # Created on first boot of an empty volume only (RABBITMQ_DEFAULT_USER/
+  # PASS); changing either later needs `rabbitmqctl` or a fresh volume.
+  username: user
+  # Pre-created Secret holding the password, see deployment/README.md. When
+  # empty, the chart creates one from password below. Keep it URL-safe (e.g.
+  # `openssl rand -hex`): the backend puts it into an amqp:// URL unescaped.
+  existingSecret: ""
+  existingSecretKey: password
+  # Plaintext fallback, disposable dev only. Ignored when existingSecret is set.
+  password: dev-only-change-me
+  persistence:
+    size: 1Gi
+  # Merged over the top-level securityContext: the image's `rabbitmq` user is
+  # uid/gid 999, not node's 1000. It runs fine with a read-only root
+  # filesystem -- everything it writes goes to /var/lib/rabbitmq (the volume).
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 ingress:
   enabled: true
   # entryPoints on the Traefik router (matches the `web` entrypoint the
@@ -106,8 +141,8 @@ ingress:
     secretName: ""
 
 # NetworkPolicies (templates/networkpolicy.yaml): auth/backend/frontend
-# only accept traffic from the ingress controller, each database only from
-# its own service. Point ingressController at wherever Traefik runs (k3s
+# only accept traffic from the ingress controller, each database and
+# rabbitmq only from the service that uses it. Point ingressController at wherever Traefik runs (k3s
 # ships it in kube-system).
 networkPolicy:
   enabled: true

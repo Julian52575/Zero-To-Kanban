@@ -1,6 +1,6 @@
 apiVersion: v2
 name: zero-to-kanban
-description: Helm chart for the Zero To Kanban Test app (backend, frontend, auth, 2x Postgres)
+description: Helm chart for the Zero To Kanban Test app (backend, frontend, auth, RabbitMQ, 2x Postgres)
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

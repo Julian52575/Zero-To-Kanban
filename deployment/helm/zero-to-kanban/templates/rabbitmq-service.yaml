@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zero-to-kanban.rabbitmq.host" . }}
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "zero-to-kanban.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+    # Management UI. Not routed by the IngressRoute and blocked by the
+    # NetworkPolicy: reach it with `kubectl port-forward`, see
+    # deployment/README.md.
+    - name: management
+      port: 15672
+      targetPort: management
