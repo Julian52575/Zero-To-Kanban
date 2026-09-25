@@ -207,9 +207,6 @@ services:
       dockerfile: Dev.Dockerfile
     environment:
       VITE_BACKEND_URL: http://backend:3000
-    volumes:
-      - ./frontend:/app
-      - frontend-node-modules:/app/node_modules
     depends_on:
       backend:
         condition: service_healthy
@@ -226,4 +223,3 @@ volumes:
   todo-db-data:
   auth-db-data:
   rabbitmq-data:
-  frontend-node-modules:
