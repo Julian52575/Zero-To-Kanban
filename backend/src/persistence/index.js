@@ -1,4 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
+const { use } = require("../app");
 
 const prisma = new PrismaClient();
 
@@ -48,6 +49,21 @@ async function userCanAccessProject(userId, projectId) {
   const project = await prisma.project.findFirst({
     where: { id: projectId, ownerId: userId },
     select: { id: true },
+  });
+  return project !== null;
+}
+
+async function userCanEditProject(userId, projectId) {
+  if (!userId || !projectId) return false;
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      OR: [
+        { ownerId: userId },
+        { collaborators: { some: { userId: userId, role: 'EDITOR', state: 'ACCEPTED',},},},],},
+    select: {
+      id: true,
+    },
   });
   return project !== null;
 }
@@ -166,6 +182,7 @@ module.exports = {
   removeItem,
 
   userCanAccessProject,
+  userCanEditProject,
   columnBelongsToProject,
 
   getColumns,
