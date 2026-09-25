@@ -2990,7 +2990,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/controllers/projectController.js",
+                      "uri": "backend/src/controllers/taskController.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 1
                     }
@@ -3599,7 +3599,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "frontend/src/setupTests.ts",
+                      "uri": "frontend/src/main.tsx",
                       "uriBaseId": "%SRCROOT%",
                       "index": 22
                     }
