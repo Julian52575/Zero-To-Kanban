@@ -30,8 +30,8 @@ see. Consumers are matched by URL, so they apply to every method on the row.
 | /health | backend/src/app.js | GET |  |
 | /items | backend/src/app.js | GET, POST | backend/spec/app.spec.js |
 | /items/:id | backend/src/app.js | DELETE, GET, PATCH, PUT |  |
-| /projects | backend/src/app.js | GET, POST | frontend/src/services/ProjectApi.ts |
-| /projects/:id | backend/src/app.js | DELETE, GET, PATCH, PUT | frontend/src/services/ProjectApi.ts |
-| /projects/:projectId/columns | backend/src/app.js | GET | frontend/src/services/columnService.ts |
-| /projects/:projectId/tasks | backend/src/app.js | GET, POST | frontend/src/services/taskService.ts |
-| /projects/:projectId/tasks/:id | backend/src/app.js | DELETE, GET, PATCH, PUT | frontend/src/services/taskService.ts |
+| /projects | backend/src/app.js | GET, POST |  |
+| /projects/:id | backend/src/app.js | DELETE, GET, PATCH, PUT |  |
+| /projects/:projectId/columns | backend/src/app.js | GET |  |
+| /projects/:projectId/tasks | backend/src/app.js | GET, POST |  |
+| /projects/:projectId/tasks/:id | backend/src/app.js | DELETE, GET, PATCH, PUT |  |
