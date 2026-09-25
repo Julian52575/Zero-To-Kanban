@@ -1,6 +1,6 @@
 ## CodeQL — `main`
 
-**Result: :white_check_mark: Passed** · 0 alert(s) · [Workflow run](https://github.com/Julian52575/Zero-To-Kanban/actions/runs/35990493793)
+**Result: :white_check_mark: Passed** · 0 alert(s) · [Workflow run](https://github.com/Julian52575/Zero-To-Kanban/actions/runs/36140646500)
 
 | Severity | Count |
 | --- | --- |
@@ -8,4 +8,4 @@
 | Warning | 0 |
 | Note | 0 |
 
-_Scanned CodeQL · refreshed 2026-09-24T11:04:24Z._
+_Scanned CodeQL · refreshed 2026-09-25T13:27:17Z._
