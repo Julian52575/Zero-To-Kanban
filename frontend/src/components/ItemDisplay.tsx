@@ -14,7 +14,7 @@ function ItemDisplay({
     onItemRemoval,
 }: ItemDisplayProps) {
     const toggleCompletion = () => {
-        fetch(`/api/items/${item.id}`, {
+        fetch(`/items/${item.id}`, {
             method: 'PUT',
             body: JSON.stringify({
                 name: item.name,
@@ -29,7 +29,7 @@ function ItemDisplay({
     };
 
     const removeItem = () => {
-        fetch(`/api/items/${item.id}`, {
+        fetch(`/items/${item.id}`, {
             method: 'DELETE',
         }).then(() => onItemRemoval(item));
     };

@@ -17,6 +17,7 @@ Dockerfile
 .envrc
 
 # Not part of the app -- tests, tooling and repo assets
+spec
 image.png
 .claude
 

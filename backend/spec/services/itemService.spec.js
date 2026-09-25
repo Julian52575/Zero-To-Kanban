@@ -1,6 +1,5 @@
-jest.mock('crypto', () => ({
-    ...jest.requireActual('crypto'),
-    randomUUID: jest.fn(() => 'test-id'),
+jest.mock('uuid', () => ({
+    v4: jest.fn(() => 'test-id'),
 }));
 
 jest.mock('../../src/repositories/itemRepository', () => ({
@@ -11,13 +10,7 @@ jest.mock('../../src/repositories/itemRepository', () => ({
     getById: jest.fn(),
 }));
 
-jest.mock('../../src/events/eventBus', () => ({
-    publishEvent: jest.fn(),
-}));
-
 const itemRepository = require('../../src/repositories/itemRepository');
-const { publishEvent } = require('../../src/events/eventBus');
-const { EVENTS } = require('../../src/events/events');
 const itemService = require('../../src/services/itemService');
 
 describe('itemService', () => {
@@ -59,11 +52,6 @@ describe('itemService', () => {
 
             expect(itemRepository.create).toHaveBeenCalledTimes(1);
             expect(itemRepository.create).toHaveBeenCalledWith(expectedItem);
-            expect(publishEvent).toHaveBeenCalledWith(EVENTS.TASK_CREATED, {
-                taskId: 'test-id',
-                name: 'New task',
-                completed: false,
-            });
             expect(result).toEqual(expectedItem);
         });
     });
@@ -78,9 +66,6 @@ describe('itemService', () => {
 
             expect(itemRepository.deleteById).toHaveBeenCalledTimes(1);
             expect(itemRepository.deleteById).toHaveBeenCalledWith(id);
-            expect(publishEvent).toHaveBeenCalledWith(EVENTS.TASK_DELETED, {
-                taskId: id,
-            });
         });
     });
 
@@ -116,26 +101,7 @@ describe('itemService', () => {
             expect(itemRepository.getById).toHaveBeenCalledTimes(1);
             expect(itemRepository.getById).toHaveBeenCalledWith(id);
 
-            expect(publishEvent).toHaveBeenCalledWith(EVENTS.TASK_UPDATED, {
-                taskId: id,
-                name: 'Updated task',
-                completed: true,
-            });
-
             expect(result).toEqual(updatedItem);
-        });
-    });
-
-    describe('getItem', () => {
-        test('returns a single item by id', async () => {
-            const item = { id: '1', name: 'Task 1', completed: false };
-
-            itemRepository.getById.mockResolvedValue(item);
-
-            const result = await itemService.getItem('1');
-
-            expect(itemRepository.getById).toHaveBeenCalledWith('1');
-            expect(result).toEqual(item);
         });
     });
 });

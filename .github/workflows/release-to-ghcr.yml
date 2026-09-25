@@ -28,8 +28,6 @@ jobs:
             context: backend
           - image: frontend
             context: frontend
-          - image: auth
-            context: auth
       fail-fast: true # fail all if any matrix jobs fails
     env:
       IMAGE: ghcr.io/julian52575/zero-to-kanban-${{ matrix.image }}

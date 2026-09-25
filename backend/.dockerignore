@@ -5,6 +5,8 @@ generated
 .env
 .env.example
 
+spec
+
 # Docker
 Dockerfile
 Dev.Dockerfile

@@ -8,13 +8,6 @@ const mockPrismaInstance = {
         update: jest.fn(),
         delete: jest.fn(),
     },
-    project: {
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-    },
 };
 
 jest.mock('@prisma/client', () => ({
@@ -98,63 +91,6 @@ describe('persistence', () => {
 
         expect(mockPrismaInstance.todoItem.delete).toHaveBeenCalledWith({
             where: { id: '1' },
-        });
-    });
-
-    test('createProject creates a project with the given fields', async () => {
-        const project = { id: 'p1', name: 'Projet' };
-        mockPrismaInstance.project.create.mockResolvedValue(project);
-
-        const result = await db.createProject(project);
-
-        expect(mockPrismaInstance.project.create).toHaveBeenCalledWith({
-            data: { id: 'p1', name: 'Projet' },
-        });
-        expect(result).toEqual(project);
-    });
-
-    test('getProjects returns every project', async () => {
-        const projects = [{ id: 'p1', name: 'Projet' }];
-        mockPrismaInstance.project.findMany.mockResolvedValue(projects);
-
-        const result = await db.getProjects();
-
-        expect(mockPrismaInstance.project.findMany).toHaveBeenCalledTimes(1);
-        expect(result).toEqual(projects);
-    });
-
-    test('getProject returns a single project by id', async () => {
-        const project = { id: 'p1', name: 'Projet' };
-        mockPrismaInstance.project.findUnique.mockResolvedValue(project);
-
-        const result = await db.getProject('p1');
-
-        expect(mockPrismaInstance.project.findUnique).toHaveBeenCalledWith({
-            where: { id: 'p1' },
-        });
-        expect(result).toEqual(project);
-    });
-
-    test('updateProject updates the name of a project by id', async () => {
-        const project = { id: 'p1', name: 'Nouveau nom' };
-        mockPrismaInstance.project.update.mockResolvedValue(project);
-
-        const result = await db.updateProject(project);
-
-        expect(mockPrismaInstance.project.update).toHaveBeenCalledWith({
-            where: { id: 'p1' },
-            data: { name: 'Nouveau nom' },
-        });
-        expect(result).toEqual(project);
-    });
-
-    test('removeProject deletes a project by id', async () => {
-        mockPrismaInstance.project.delete.mockResolvedValue();
-
-        await db.removeProject('p1');
-
-        expect(mockPrismaInstance.project.delete).toHaveBeenCalledWith({
-            where: { id: 'p1' },
         });
     });
 });

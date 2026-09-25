@@ -9,7 +9,7 @@ function AddItemForm({ onNewItem }) {
         e.preventDefault();
         setSubmitting(true);
 
-        fetch('/api/items', {
+        fetch('/items', {
             method: 'POST',
             body: JSON.stringify({ name: newItem }),
             headers: {

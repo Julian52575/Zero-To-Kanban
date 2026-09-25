@@ -1,17 +1,8 @@
 const itemRepository = require('../repositories/itemRepository');
-const { randomUUID: uuid } = require('crypto');
-
-const { publishEvent } = require('../events/eventBus');
-const { EVENTS } = require("../events/events");
-const { taskPayload } = require("../events/payloads");
-
+const { v4: uuid } = require('uuid');
 
 async function getItems() {
     return itemRepository.getAll();
-}
-
-async function getItem(id) {
-    return itemRepository.getById(id);
 }
 
 async function createItem(data) {
@@ -20,17 +11,12 @@ async function createItem(data) {
         name: data.name,
         completed: false,
     };
-    const created = await itemRepository.create(item);
 
-    await publishEvent(EVENTS.TASK_CREATED, taskPayload(created));
-
-    return created;
+    return itemRepository.create(item);
 }
 
 async function deleteItem(id) {
-    await itemRepository.deleteById(id);
-
-    await publishEvent(EVENTS.TASK_DELETED, { taskId: id });
+    return itemRepository.deleteById(id);
 }
 
 async function updateItem(id, data) {
@@ -41,16 +27,11 @@ async function updateItem(id, data) {
 
     await itemRepository.updateById(id, item);
 
-    const updated = await itemRepository.getById(id);
-
-    await publishEvent(EVENTS.TASK_UPDATED, taskPayload(updated));
-
-    return updated;
+    return itemRepository.getById(id);
 }
 
 module.exports = {
     getItems,
-    getItem,
     createItem,
     deleteItem,
     updateItem,

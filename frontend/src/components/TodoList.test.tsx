@@ -29,7 +29,7 @@ describe('TodoList', () => {
 
         expect(await screen.findByText('Buy milk')).toBeInTheDocument();
         expect(screen.getByText('Walk dog')).toBeInTheDocument();
-        expect(fetch).toHaveBeenCalledWith('/api/items');
+        expect(fetch).toHaveBeenCalledWith('/items');
     });
 
     test('shows an empty-state message when there are no items', async () => {
@@ -72,7 +72,7 @@ describe('TodoList', () => {
     test('toggling an item updates it in place', async () => {
         const user = userEvent.setup();
         (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-            if (url === '/api/items') {
+            if (url === '/items') {
                 return Promise.resolve({
                     json: () =>
                         Promise.resolve([
@@ -104,7 +104,7 @@ describe('TodoList', () => {
     test('removing an item drops it from the list', async () => {
         const user = userEvent.setup();
         (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-            if (url === '/api/items') {
+            if (url === '/items') {
                 return Promise.resolve({
                     json: () =>
                         Promise.resolve([

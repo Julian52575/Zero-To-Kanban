@@ -5,11 +5,6 @@ async function getItems(req, res) {
     res.send(items);
 }
 
-async function getItem(req, res) {
-    const item = await itemService.getItem(req.params.id);
-    res.send(item);
-}
-
 async function addItem(req, res) {
     const item = await itemService.createItem(req.body);
 
@@ -33,7 +28,6 @@ async function updateItem(req, res) {
 
 module.exports = {
     getItems,
-    getItem,
     addItem,
     deleteItem,
     updateItem,
