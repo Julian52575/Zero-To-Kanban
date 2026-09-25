@@ -3,11 +3,11 @@
 {{- $fullname := include "zero-to-kanban.fullname" . }}
 # Every call into auth/backend/frontend goes through Traefik, so its
 # middlewares (strip-identity, require-login) can't be bypassed from inside
-# the cluster. Each database only accepts its own service. Kubelet probes
-# and `kubectl exec`/`port-forward` are unaffected.
+# the cluster. Each database and rabbitmq only accept the service that uses
+# them. Kubelet probes and `kubectl exec`/`port-forward` are unaffected.
 #
-# 1. Deny all ingress to this release's pods (app + both databases); the
-#    policies below are the only exceptions.
+# 1. Deny all ingress to this release's pods (app, both databases,
+#    rabbitmq); the policies below are the only exceptions.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,7 +21,8 @@ spec:
   policyTypes:
     - Ingress
 ---
-# 2. auth, backend, frontend: only from the ingress controller.
+# 2. auth, backend, frontend: only from the ingress controller. Components
+#    listed by name: rabbitmq shares these name/instance labels.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -33,6 +34,10 @@ spec:
     matchLabels:
       app.kubernetes.io/name: {{ $name }}
       app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [auth, backend, frontend]
   policyTypes:
     - Ingress
   ingress:
@@ -117,4 +122,30 @@ spec:
               app.kubernetes.io/component: auth
       ports:
         - port: 5432
+---
+# 6. rabbitmq: AMQP only, only from backend. The management UI (15672) is
+#    reachable through `kubectl port-forward` only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-rabbitmq-from-backend
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: backend
+      ports:
+        - port: 5672
 {{- end }}

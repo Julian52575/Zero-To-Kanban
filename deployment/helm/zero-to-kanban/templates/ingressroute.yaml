@@ -3,9 +3,10 @@
 # https://doc.traefik.io/traefik/reference/dynamic-configuration/kubernetes-crd/
 #
 # Routing mirrors the docker-compose Traefik proxy: /auth, /login, /register
-# -> auth (priority 100, public), /items -> backend (priority 10), everything
-# else -> frontend (priority 1, catch-all). backend and frontend are guarded
-# by strip-identity + require-login (ForwardAuth to the auth service).
+# -> auth (priority 100, public), /api -> backend with the prefix stripped
+# (priority 10), everything else -> frontend (priority 1, catch-all). backend
+# and frontend are guarded by strip-identity + require-login (ForwardAuth to
+# the auth service).
 #
 # No Host() match -- routes on path alone, so any hostname/IP reaching
 # these entryPoints works with no /etc/hosts entry needed. This also keeps
@@ -28,12 +29,13 @@ spec:
       services:
         - name: {{ include "zero-to-kanban.fullname" . }}-auth
           port: 4000
-    - match: PathPrefix(`/items`)
+    - match: PathPrefix(`/api`)
       kind: Rule
       priority: 10
       middlewares:
         - name: {{ include "zero-to-kanban.fullname" . }}-strip-identity
         - name: {{ include "zero-to-kanban.fullname" . }}-require-login
+        - name: {{ include "zero-to-kanban.fullname" . }}-backend-stripprefix
       services:
         - name: {{ include "zero-to-kanban.fullname" . }}-backend
           port: 3000
@@ -49,7 +51,7 @@ spec:
     {{- if .Values.ingress.metrics.enabled }}
     # Traefik's own Prometheus metrics, via its built-in internal service --
     # not one of ours, so no port/namespace to set. Priority just needs to
-    # beat the `/` catch-all above; it can't collide with /auth or /items.
+    # beat the `/` catch-all above; it can't collide with /auth or /api.
     # Guarded by its own BasicAuth (metrics-auth.yaml), not the app's
     # strip-identity/require-login pair -- see that file for why.
     - match: PathPrefix(`{{ .Values.ingress.metrics.path }}`)

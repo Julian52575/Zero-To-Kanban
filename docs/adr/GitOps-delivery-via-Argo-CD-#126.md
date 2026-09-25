@@ -59,6 +59,12 @@ Medium -- days
 
 _No response_
 
+### Amendment (2026-09-23): the root app no longer manages dev
+
+`root-app.yaml` runs on the public prod cluster, so it now excludes `dev-app.yaml` as well and only creates `ztk-prod`. `ztk-dev` serves the plaintext dev defaults from `values.yaml` (session signing key, `/metrics` password) on the `web` entrypoint with no hostname, so on a shared cluster anyone could reach dev and forge a session with the published key. `dev-app.yaml` is now applied by hand, on a dev cluster only.
+
+This changes option 3 above: the root app no longer discovers one child Application per environment, only prod. Adding a prod-like environment is still "add a file"; a dev-like one must also be added to the root app's `exclude`, or get a cluster of its own.
+
 ---
 ## Comments
 

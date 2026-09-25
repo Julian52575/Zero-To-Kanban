@@ -57,6 +57,16 @@ Name of the Secret holding the Postgres password.
 {{- .Values.authdb.auth.secretKeys.userPasswordKey | default "password" -}}
 {{- end -}}
 
+{{/* Hostname of the rabbitmq Service */}}
+{{- define "zero-to-kanban.rabbitmq.host" -}}
+{{- printf "%s-rabbitmq" (include "zero-to-kanban.fullname" .) -}}
+{{- end -}}
+
+{{/* Name of the Secret holding the rabbitmq password */}}
+{{- define "zero-to-kanban.rabbitmq.secretName" -}}
+{{- default (printf "%s-rabbitmq" (include "zero-to-kanban.fullname" .)) .Values.rabbitmq.existingSecret -}}
+{{- end -}}
+
 {{/* Name of the Secret holding SESSION_SECRET */}}
 {{- define "zero-to-kanban.auth.secretName" -}}
 {{- default (printf "%s-auth" (include "zero-to-kanban.fullname" .)) .Values.auth.existingSecret -}}
