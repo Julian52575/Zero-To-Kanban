@@ -1,7 +1,12 @@
 const http = require('http');
 
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-id'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'test-id'),
+}));
+
+jest.mock('../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
 }));
 
 jest.mock('../src/repositories/itemRepository', () => ({
@@ -29,6 +34,13 @@ afterAll((done) => {
     server.close(done);
 });
 
+// Traefik injects the authenticated user; requests without it are rejected.
+const api = (path, init = {}) =>
+    fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: { 'X-Auth-User-Id': 'user-1', ...init.headers },
+    });
+
 beforeEach(() => {
     jest.clearAllMocks();
 });
@@ -36,7 +48,7 @@ beforeEach(() => {
 test('disables the x-powered-by header', async () => {
     itemRepository.getAll.mockResolvedValue([]);
 
-    const res = await fetch(`${baseUrl}/items`);
+    const res = await api('/items');
 
     expect(res.headers.get('x-powered-by')).toBeNull();
 });
@@ -45,7 +57,7 @@ test('GET /items lists items', async () => {
     const items = [{ id: '1', name: 'Task 1', completed: false }];
     itemRepository.getAll.mockResolvedValue(items);
 
-    const res = await fetch(`${baseUrl}/items`);
+    const res = await api('/items');
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -56,7 +68,7 @@ test('POST /items creates an item from a JSON body', async () => {
     const created = { id: '1', name: 'New task', completed: false };
     itemRepository.create.mockResolvedValue(created);
 
-    const res = await fetch(`${baseUrl}/items`, {
+    const res = await api('/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'New task' }),
@@ -72,7 +84,7 @@ test('PUT /items/:id updates an item', async () => {
     itemRepository.updateById.mockResolvedValue();
     itemRepository.getById.mockResolvedValue(updated);
 
-    const res = await fetch(`${baseUrl}/items/1`, {
+    const res = await api('/items/1', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Updated', completed: true }),
@@ -89,8 +101,22 @@ test('PUT /items/:id updates an item', async () => {
 test('DELETE /items/:id deletes an item', async () => {
     itemRepository.deleteById.mockResolvedValue();
 
-    const res = await fetch(`${baseUrl}/items/1`, { method: 'DELETE' });
+    const res = await api('/items/1', { method: 'DELETE' });
 
     expect(itemRepository.deleteById).toHaveBeenCalledWith('1');
     expect(res.status).toBe(200);
+});
+
+test('GET /health answers without authentication', async () => {
+    const res = await fetch(`${baseUrl}/health`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+});
+
+test('rejects API requests without an authenticated user', async () => {
+    const res = await fetch(`${baseUrl}/items`);
+
+    expect(res.status).toBe(401);
+    expect(itemRepository.getAll).not.toHaveBeenCalled();
 });

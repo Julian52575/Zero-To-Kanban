@@ -15,3 +15,46 @@ model TodoItem {
   @@map("todo_items")
 }
 
+model Column {
+  id        String   @id @default(uuid())
+  name      String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([projectId])
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  columnId    String
+  column      Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  creatorId   String
+  assigneeId  String?
+}
+
+model Project {
+  id        String  @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  ownerId   String
+  columns   Column[]
+
+  @@map("projects")
+  @@index([ownerId])
+}
+
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}

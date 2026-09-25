@@ -1,0 +1,27 @@
+{{- if and .Values.ingress.enabled .Values.ingress.metrics.enabled }}
+{{- if not .Values.ingress.metrics.auth.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "zero-to-kanban.metricsAuth.secretName" . }}
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics-auth
+type: Opaque
+stringData:
+  {{ include "zero-to-kanban.metricsAuth.secretKey" . }}: {{ htpasswd (required "ingress.metrics.auth.username or ingress.metrics.auth.existingSecret must be set" .Values.ingress.metrics.auth.username) (required "ingress.metrics.auth.password or ingress.metrics.auth.existingSecret must be set" .Values.ingress.metrics.auth.password) | quote }}
+{{- end }}
+---
+# Deliberately its own credential, not the app's strip-identity/require-login
+# ForwardAuth pair -- a logged-in app user shouldn't be able to read
+# cluster/router topology through this just because they're logged in.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "zero-to-kanban.fullname" . }}-metrics-auth
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+spec:
+  basicAuth:
+    secret: {{ include "zero-to-kanban.metricsAuth.secretName" . }}
+{{- end }}

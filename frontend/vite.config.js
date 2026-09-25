@@ -5,14 +5,15 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    // Prefer TS/TSX over the stale, superseded .jsx/.js duplicates left in
-    // src/ and components/ -- see frontend cleanup notes.
-    extensions: ['.tsx', '.ts', '.mjs', '.js', '.jsx', '.json'],
-  },
   server: {
     proxy: {
-      '/items': 'http://backend:3000',
+      // Defaults to a locally-run backend. Set VITE_BACKEND_URL to the
+      // compose network hostname when running via docker compose
+      // (e.g. `http://backend:3000`).
+      '/api': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
   test: {

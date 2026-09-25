@@ -1,13 +1,18 @@
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'something-not-a-uuid'),
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: jest.fn(() => 'something-not-a-uuid'),
 }));
 
 jest.mock('../../src/repositories/itemRepository', () => ({
     create: jest.fn(),
 }));
 
+jest.mock('../../src/events/eventBus', () => ({
+    publishEvent: jest.fn(),
+}));
+
 const itemRepository = require('../../src/repositories/itemRepository');
-const addItem = require('../../src/routes/addItem');
+const addItem = require('../../src/routes/item/addItem');
 
 test('it stores item correctly', async () => {
     const id = 'something-not-a-uuid';

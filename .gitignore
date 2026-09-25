@@ -28,12 +28,21 @@ result-*
 
 .claude
 .vscode
-node_modules/
+
 # --- database dump ----------------------------------------------
 db_backup_*.sql
+*.db
+
+
+node_modules/
 
 # --- SAST ------------------------------------------------------
 # Scanner scratch. The kept record is .sast/report/ (tracked, refreshed by CI).
 /.scannerwork/
 /.sast/codeql-db/
 /.sast/codeql-results/
+
+# Kubernetes package
+deployment/.k3s/
+deployment/k3s.yaml
+deployment/helm/*/charts/*.tgz

@@ -1,95 +1,77 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, test, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ItemDisplay from './ItemDisplay';
 import type { Item } from '../types/item';
 
 describe('ItemDisplay', () => {
-    beforeEach(() => {
-        vi.stubGlobal('fetch', vi.fn());
-    });
+    const item: Item = { id: '1', name: 'Buy milk', completed: false, status: 'todo' };
 
-    const item: Item = { id: '1', name: 'Buy milk', completed: false };
+    function setup() {
+        const onRename = vi.fn();
+        const onDelete = vi.fn();
+        render(<ItemDisplay item={item} onRename={onRename} onDelete={onDelete} />);
+        return { user: userEvent.setup(), onRename, onDelete };
+    }
 
-    test('renders the item name', () => {
-        render(
-            <ItemDisplay
-                item={item}
-                onItemUpdate={vi.fn()}
-                onItemRemoval={vi.fn()}
-            />,
-        );
+    test('renders the item name and a delete button', () => {
+        setup();
 
         expect(screen.getByText('Buy milk')).toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Mark item as complete' }),
+            screen.getByRole('button', { name: 'Supprimer "Buy milk"' }),
         ).toBeInTheDocument();
     });
 
-    test('shows the completed affordance for a completed item', () => {
-        render(
-            <ItemDisplay
-                item={{ ...item, completed: true }}
-                onItemUpdate={vi.fn()}
-                onItemRemoval={vi.fn()}
-            />,
-        );
+    test('clicking delete reports the item', async () => {
+        const { user, onDelete } = setup();
 
-        expect(
-            screen.getByRole('button', { name: 'Mark item as incomplete' }),
-        ).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Supprimer "Buy milk"' }));
+
+        expect(onDelete).toHaveBeenCalledWith(item);
     });
 
-    test('toggling completion PUTs the flipped item and reports it back', async () => {
-        const user = userEvent.setup();
-        const onItemUpdate = vi.fn();
-        const updatedItem = { ...item, completed: true };
+    test('double-clicking the name switches to an edit field', async () => {
+        const { user } = setup();
 
-        (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-            json: () => Promise.resolve(updatedItem),
-        });
+        await user.dblClick(screen.getByText('Buy milk'));
 
-        render(
-            <ItemDisplay
-                item={item}
-                onItemUpdate={onItemUpdate}
-                onItemRemoval={vi.fn()}
-            />,
-        );
-
-        await user.click(
-            screen.getByRole('button', { name: 'Mark item as complete' }),
-        );
-
-        expect(fetch).toHaveBeenCalledWith('/items/1', {
-            method: 'PUT',
-            body: JSON.stringify({ name: 'Buy milk', completed: true }),
-            headers: { 'Content-Type': 'application/json' },
-        });
-
-        await waitFor(() =>
-            expect(onItemUpdate).toHaveBeenCalledWith(updatedItem),
-        );
+        expect(screen.getByRole('textbox')).toHaveValue('Buy milk');
+        expect(screen.getByRole('textbox')).toHaveFocus();
     });
 
-    test('removing the item DELETEs it and reports it back', async () => {
-        const user = userEvent.setup();
-        const onItemRemoval = vi.fn();
+    test('pressing Enter saves the new name', async () => {
+        const { user, onRename } = setup();
 
-        (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({});
+        await user.dblClick(screen.getByText('Buy milk'));
+        await user.clear(screen.getByRole('textbox'));
+        await user.type(screen.getByRole('textbox'), 'Buy oat milk{Enter}');
 
-        render(
-            <ItemDisplay
-                item={item}
-                onItemUpdate={vi.fn()}
-                onItemRemoval={onItemRemoval}
-            />,
-        );
+        expect(onRename).toHaveBeenCalledWith(item, 'Buy oat milk');
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    });
 
-        await user.click(screen.getByRole('button', { name: 'Remove Item' }));
+    test('clicking OK saves the new name', async () => {
+        const { user, onRename } = setup();
 
-        expect(fetch).toHaveBeenCalledWith('/items/1', { method: 'DELETE' });
+        await user.dblClick(screen.getByText('Buy milk'));
+        await user.type(screen.getByRole('textbox'), '!');
+        await user.click(screen.getByRole('button', { name: 'OK' }));
 
-        await waitFor(() => expect(onItemRemoval).toHaveBeenCalledWith(item));
+        expect(onRename).toHaveBeenCalledWith(item, 'Buy milk!');
+    });
+
+    test('pressing Escape cancels the edit without renaming', async () => {
+        const { user, onRename } = setup();
+
+        await user.dblClick(screen.getByText('Buy milk'));
+        await user.type(screen.getByRole('textbox'), ' draft{Escape}');
+
+        expect(onRename).not.toHaveBeenCalled();
+        expect(screen.getByText('Buy milk')).toBeInTheDocument();
+
+        // Re-entering edit mode starts from the original name, not the discarded draft.
+        await user.dblClick(screen.getByText('Buy milk'));
+        expect(screen.getByRole('textbox')).toHaveValue('Buy milk');
     });
 });

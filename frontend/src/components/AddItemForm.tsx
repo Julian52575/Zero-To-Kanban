@@ -1,28 +1,46 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
+import type { Item } from '../types/item';
+import { getErrorMessage } from '../utils/errorMessage';
+import { createTask } from '../services/taskService';
 
-function AddItemForm({ onNewItem }) {
+interface AddItemFormProps {
+    projectId: string;
+    onNewItem: (item: Item) => void;
+    columnId?: string; // Optional columnId prop
+}
+
+function AddItemForm({projectId, onNewItem ,columnId}: AddItemFormProps) {
     const [newItem, setNewItem] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
 
-    const submitNewItem = e => {
+
+    const submitNewItem = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        setSubmitting(true);
+        if (!columnId) return;
 
-        fetch('/items', {
-            method: 'POST',
-            body: JSON.stringify({ name: newItem }),
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(r => r.json())
-            .then(item => {
-                onNewItem(item);
-                setSubmitting(false);
+        setSubmitting(true);
+        setError(null);
+        createTask(projectId, { title: newItem.trim(), columnId })
+            .then(task => {
+                onNewItem({
+                    id: task.id,
+                    name: task.title,
+                    completed: false,
+                    status: 'todo',
+                });
                 setNewItem('');
+            })
+            .catch(error => {
+                console.error(error);
+                setError(getErrorMessage(error));
+            })
+            .finally(() => {
+                setSubmitting(false);
             });
     };
+    const isDisabled = submitting || !columnId || newItem.trim().length === 0;
 
     return (
         <Form onSubmit={submitNewItem}>
@@ -34,16 +52,20 @@ function AddItemForm({ onNewItem }) {
                     placeholder="New Item"
                     aria-describedby="basic-addon1"
                 />
-
                 <Button
                     type="submit"
                     variant="success"
-                    disabled={!newItem.length}
-                    className={submitting ? 'disabled' : ''}
+                    className={isDisabled ? 'disabled' : ''}
+                    disabled={isDisabled}
                 >
                     {submitting ? 'Adding...' : 'Add Item'}
                 </Button>
             </InputGroup>
+            {error && (
+                <p className="text-danger">
+                    {error}
+                </p>
+            )}
         </Form>
     );
 }

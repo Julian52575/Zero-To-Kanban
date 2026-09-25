@@ -1,0 +1,46 @@
+# Overrides for the dev environment. Used by the Argo CD Applications in
+# deployment/argocd/environments/dev-app.yaml, dev-k3s-app.yaml and
+# dev-k3s-local-app.yaml.
+
+backend:
+  image:
+    tag: manual-test
+    pullPolicy: Always
+  replicaCount: 1
+
+auth:
+  image:
+    tag: manual-test
+    pullPolicy: Always
+  replicaCount: 1
+
+frontend:
+  image:
+    tag: manual-test
+    pullPolicy: Always
+  replicaCount: 1
+  # The dev image runs the Vite/Rolldown dev server in-cluster, not the
+  # prebuilt static bundle the base values.yaml's 128Mi limit assumes -- the
+  # dev server routinely needs several hundred MB and was getting OOM-killed
+  # (memory.oom.group), taking down the whole rootless k3s node with it.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+rabbitmq:
+  persistence:
+    size: 1Gi
+
+postgresql:
+  primary:
+    persistence:
+      size: 1Gi
+
+authdb:
+  primary:
+    persistence:
+      size: 1Gi

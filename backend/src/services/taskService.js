@@ -1,23 +1,35 @@
-const taskRepository = require('../repositories/taskRepository');
+const taskRepository = require("../repositories/taskRepository");
+const { userCanAccessProject } = require("../persistence");
 
-async function getTasks() {
-  return taskRepository.getAll();
+async function getTasks(projectId) {
+  return taskRepository.getAll(projectId);
 }
 
 async function getTask(id) {
   return taskRepository.getById(id);
 }
 
-async function createTask(task) {
-  return taskRepository.create(task);
+async function createTask(columnId, creatorId, taskData) {
+  const response = await taskRepository.create(columnId, creatorId, taskData);
+  return response;
 }
 
-async function updateTask(id, task) {
-  return taskRepository.update(id, task);
+async function updateTask(id, taskData) {
+  return taskRepository.update(id, taskData);
 }
 
-async function deleteTask(id) {
-  return taskRepository.deleteById(id);
+async function deleteTask(id, userId) {
+  const task = await taskRepository.getById(id);
+
+  if (!task) {
+    return null;
+  }
+
+  if (!(await userCanAccessProject(userId, task.column.projectId))) {
+    return false;
+  }
+
+  return await taskRepository.deleteById(id);
 }
 
 module.exports = {
