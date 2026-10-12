@@ -16,8 +16,8 @@ name: openssf-scorecard
 # cadence, the same integration-branch pattern as Dependabot.
 
 on:
-  schedule:
-    - cron: "0 9 * * 1" # Mondays 09:00 UTC (GitHub cron is always UTC)
+  #schedule:
+  #  - cron: "0 9 * * 1" # Mondays 09:00 UTC (GitHub cron is always UTC)
   workflow_dispatch:
 
 permissions:
